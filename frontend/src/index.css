@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 类似XMind的网格背景 */
+.react-flow__pane {
+  background-image: 
+    linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+    linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* 自定义节点样式 */
+.agent-node {
+  @apply bg-blue-100 border-2 border-blue-500 rounded-full shadow-md flex items-center justify-center;
+  width: 120px;
+  height: 60px;
+}
+
+.conversation-node {
+  @apply bg-white border border-gray-300 rounded-lg shadow-md overflow-hidden;
+  width: 280px;
+  min-height: 100px;
+}
+
+.conversation-node.hidden {
+  @apply border-dashed border-gray-400 bg-gray-50 opacity-60;
+}
+
+.conversation-node.auto-created {
+  @apply border-2 border-yellow-400 bg-yellow-50;
+  animation: pulse 0.5s ease-in-out 3;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.7); }
+  50% { box-shadow: 0 0 0 8px rgba(250, 204, 21, 0); }
+}
