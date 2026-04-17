@@ -14,6 +14,7 @@ import AgentNode from './components/AgentNode';
 import ConversationNode from './components/ConversationNode';
 import Toolbar from './components/Toolbar';
 import ContextMenu from './components/ContextMenu';
+import HistorySidebar from './components/HistorySidebar';
 import { wouldCreateCycle } from './utils/graphUtils';
 import { getAgents } from './api';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,50 +25,33 @@ const nodeTypes = {
 };
 
 export default function App() {
-  const { nodes: storeNodes, setNodes, addNode, updateNode, deleteNode, autoNodeEnabled } = useStore();
+  const { 
+    init, 
+    getCurrentNodes, 
+    updateCurrentNodes, 
+    addNode, 
+    updateNode, 
+    deleteNode, 
+    autoNodeEnabled,
+    currentFileId,
+  } = useStore();
   const [nodes, setNodesFlow, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [menu, setMenu] = useState(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [initialized, setInitialized] = useState(false);
 
-  // 强制从后端同步 Agent 根节点
+  // 初始化 store（创建默认文件）
   useEffect(() => {
-    if (initialized) return;
-    getAgents()
-      .then(agentList => {
-        const existingAgentIds = storeNodes.filter(n => n.type === 'agent').map(n => n.id);
-        const newAgentIds = agentList.map(a => a.id);
-        const needUpdate = existingAgentIds.length !== newAgentIds.length ||
-          !existingAgentIds.every(id => newAgentIds.includes(id));
-        
-        if (needUpdate) {
-          const startX = 100;
-          const startY = 100;
-          const gapX = 350;
-          const newAgentNodes = agentList.map((agent, index) => ({
-            id: agent.id,
-            type: 'agent',
-            name: agent.name,
-            model: agent.model,
-            position: { x: startX + index * gapX, y: startY },
-          }));
-          setNodes(newAgentNodes);
-          if (storeNodes.some(n => n.type !== 'agent')) {
-            alert('检测到 Agent 列表已变化，所有历史对话节点已被清除。');
-          }
-        }
-        setInitialized(true);
-      })
-      .catch(err => {
-        console.error('Failed to load agents', err);
-        setInitialized(true);
-      });
-  }, [storeNodes, setNodes, initialized]);
+    init();
+  }, [init]);
 
-  // 同步 store 中的节点到 ReactFlow 状态，并生成边
+  // 获取当前节点（每次渲染重新获取）
+  const currentNodes = getCurrentNodes();
+
+  // 同步 currentNodes 到 ReactFlow 并生成边
   useEffect(() => {
-    const flowNodes = storeNodes.map(node => ({
+    const flowNodes = currentNodes.map(node => ({
       id: node.id,
       type: node.type,
       position: node.position,
@@ -75,7 +59,7 @@ export default function App() {
     }));
     setNodesFlow(flowNodes);
     
-    const flowEdges = storeNodes
+    const flowEdges = currentNodes
       .filter(node => node.parentId && node.type !== 'agent')
       .map(node => ({
         id: `${node.parentId}-${node.id}`,
@@ -85,33 +69,62 @@ export default function App() {
         animated: false,
       }));
     setEdges(flowEdges);
-  }, [storeNodes, setNodesFlow, setEdges]);
+  }, [currentNodes, setNodesFlow, setEdges]);
 
+  // 初始化 Agent 根节点（如果当前文件没有根节点）
+  useEffect(() => {
+    if (!initialized) return;
+    const hasAgentRoot = currentNodes.some(n => n.type === 'agent');
+    if (!hasAgentRoot) {
+      getAgents()
+        .then(agentList => {
+          if (agentList.length) {
+            const startX = 100;
+            const startY = 100;
+            const gapX = 350;
+            const newAgentNodes = agentList.map((agent, index) => ({
+              id: agent.id,
+              type: 'agent',
+              name: agent.name,
+              model: agent.model,
+              position: { x: startX + index * gapX, y: startY },
+            }));
+            updateCurrentNodes([...currentNodes, ...newAgentNodes]);
+          }
+        })
+        .catch(err => console.error('Failed to load agents', err));
+    }
+  }, [initialized, currentNodes, updateCurrentNodes]);
+
+  // 加载 agents 完成标记
+  useEffect(() => {
+    if (!initialized) {
+      getAgents()
+        .then(() => setInitialized(true))
+        .catch(() => setInitialized(true));
+    }
+  }, [initialized]);
+
+  // 以下所有 useCallback 依赖 currentNodes 或 updateNode 等，定义在 currentNodes 声明之后
   const onNodeDragStop = useCallback((_, node) => {
-    const existing = storeNodes.find(n => n.id === node.id);
+    const existing = currentNodes.find(n => n.id === node.id);
     if (existing && (existing.position.x !== node.position.x || existing.position.y !== node.position.y)) {
       updateNode(node.id, { position: node.position });
     }
-  }, [storeNodes, updateNode]);
+  }, [currentNodes, updateNode]);
 
-  // 连接节点（重新指定父节点）
   const onConnect = useCallback((params) => {
     const { source, target } = params;
-    const targetNode = storeNodes.find(n => n.id === target);
+    const targetNode = currentNodes.find(n => n.id === target);
     if (!targetNode) return;
     
-    // 允许连接到 Agent 根节点，无需循环检测
     if (targetNode.type !== 'agent') {
-      if (wouldCreateCycle(storeNodes, source, target)) {
+      if (wouldCreateCycle(currentNodes, source, target)) {
         alert('不能形成循环引用');
         return;
       }
     }
-    
-    // 更新父节点
     updateNode(source, { parentId: target });
-    
-    // 确定 agentId
     let newAgentId = null;
     if (targetNode.type === 'agent') {
       newAgentId = target;
@@ -121,26 +134,23 @@ export default function App() {
     if (newAgentId) {
       updateNode(source, { agentId: newAgentId });
     }
-  }, [storeNodes, updateNode]);
+  }, [currentNodes, updateNode]);
 
-  // 双击连线：删除连线，子节点变为自由节点
   const onEdgeDoubleClick = useCallback((event, edge) => {
     const childId = edge.source;
     updateNode(childId, { parentId: null });
     alert('连线已删除，该节点及其子节点现在为自由节点，可重新连接');
   }, [updateNode]);
 
-  // 复制节点（保留原回复）
   const handleCopyNode = useCallback(() => {
     if (!menu || !reactFlowInstance) return;
     const nodeId = menu.nodeId;
-    const originalNode = storeNodes.find(n => n.id === nodeId);
+    const originalNode = currentNodes.find(n => n.id === nodeId);
     if (!originalNode) return;
     if (originalNode.type === 'agent') {
       alert('不能复制 Agent 根节点');
       return;
     }
-    // 获取当前鼠标位置（相对于画布）
     const position = reactFlowInstance.screenToFlowPosition({
       x: menu.x,
       y: menu.y,
@@ -149,17 +159,17 @@ export default function App() {
     const newNode = {
       id: newNodeId,
       type: 'conversation',
-      parentId: null,                      // 自由节点
+      parentId: null,
       agentId: originalNode.agentId,
       question: originalNode.question,
-      answer: originalNode.answer,        // 保留原回复
+      answer: originalNode.answer,
       hidden: originalNode.hidden,
       isAutoCreated: false,
       position: position,
     };
     addNode(newNode);
     closeMenu();
-  }, [menu, storeNodes, addNode, reactFlowInstance]);
+  }, [menu, currentNodes, addNode, reactFlowInstance]);
 
   const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
@@ -217,6 +227,7 @@ export default function App() {
   return (
     <div className="w-full h-screen">
       <Toolbar />
+      <HistorySidebar />
       <ReactFlow
         nodes={nodes}
         edges={edges}

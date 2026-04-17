@@ -11,7 +11,7 @@ export default function ConversationNode({ id, data }) {
   const [isSending, setIsSending] = useState(false);
   const inputRef = useRef(null);
   const updateNode = useStore(state => state.updateNode);
-  const storeNodes = useStore(state => state.nodes);
+  const getCurrentNodes = useStore(state => state.getCurrentNodes);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -24,14 +24,15 @@ export default function ConversationNode({ id, data }) {
     
     setIsSending(true);
     try {
-      const node = storeNodes.find(n => n.id === id);
+      const allNodes = getCurrentNodes(); // 获取当前文件的所有节点
+      const node = allNodes.find(n => n.id === id);
       if (!node) return;
       
-      const context = collectContext(storeNodes, node.parentId);
+      const context = collectContext(allNodes, node.parentId);
       
       let agentId = node.agentId;
       if (!agentId) {
-        const nearest = findNearestAgentId(storeNodes, id);
+        const nearest = findNearestAgentId(allNodes, id);
         if (!nearest) {
           alert('该节点未连接到任何 Agent，请先连接至 Agent 根节点');
           setIsSending(false);

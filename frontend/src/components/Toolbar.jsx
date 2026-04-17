@@ -2,14 +2,10 @@ import React from 'react';
 import useStore from '../store';
 
 export default function Toolbar() {
-  const { autoNodeEnabled, toggleAutoNode, nodes, setNodes, saveCurrentToHistory } = useStore();
+  const { autoNodeEnabled, toggleAutoNode, createNewFile } = useStore();
 
   const handleNewConversation = () => {
-    // 保存当前画布到历史（如果有对话节点）
-    saveCurrentToHistory();
-    // 清空画布，只保留 Agent 根节点
-    const agentRoots = nodes.filter(n => n.type === 'agent');
-    setNodes(agentRoots);
+    createNewFile();
   };
 
   return (
