@@ -17,8 +17,6 @@ import ContextMenu from './components/ContextMenu';
 import { wouldCreateCycle } from './utils/graphUtils';
 import { getAgents } from './api';
 import { v4 as uuidv4 } from 'uuid';
-import HistorySidebar from './components/HistorySidebar';
-
 
 const nodeTypes = {
   agent: AgentNode,
@@ -67,7 +65,7 @@ export default function App() {
       });
   }, [storeNodes, setNodes, initialized]);
 
-  // 同步 store 中的节点到 ReactFlow 状态，并生成边（贝塞尔曲线）
+  // 同步 store 中的节点到 ReactFlow 状态，并生成边
   useEffect(() => {
     const flowNodes = storeNodes.map(node => ({
       id: node.id,
@@ -89,45 +87,6 @@ export default function App() {
     setEdges(flowEdges);
   }, [storeNodes, setNodesFlow, setEdges]);
 
-  const onEdgeDoubleClick = useCallback((event, edge) => {
-    // edge.source 是子节点，edge.target 是父节点
-    const childId = edge.source;
-    // 将该子节点的 parentId 设为 null，使其成为自由节点
-    updateNode(childId, { parentId: null });
-    // 注意：后代节点无需修改，它们仍然指向该子节点，但由于子节点已无父节点，整个子树成为自由树
-    alert('连线已删除，该节点及其子节点现在为自由节点，可重新连接');
-  }, [updateNode]);
-
-  // 复制节点
-  const handleCopyNode = useCallback(() => {
-    if (!menu) return;
-    const nodeId = menu.nodeId;
-    const originalNode = storeNodes.find(n => n.id === nodeId);
-    if (!originalNode) return;
-    if (originalNode.type === 'agent') {
-      alert('不能复制 Agent 根节点');
-      return;
-    }
-    const newNodeId = uuidv4();
-    const newPosition = {
-      x: originalNode.position.x + 30,
-      y: originalNode.position.y + 30,
-    };
-    const newNode = {
-      id: newNodeId,
-      type: 'conversation',
-      parentId: null,
-      agentId: originalNode.agentId,
-      question: originalNode.question,
-      answer: '',
-      hidden: originalNode.hidden,
-      isAutoCreated: false,
-      position: newPosition,
-    };
-    addNode(newNode);
-    closeMenu();
-  }, [menu, storeNodes, addNode]);
-
   const onNodeDragStop = useCallback((_, node) => {
     const existing = storeNodes.find(n => n.id === node.id);
     if (existing && (existing.position.x !== node.position.x || existing.position.y !== node.position.y)) {
@@ -135,14 +94,21 @@ export default function App() {
     }
   }, [storeNodes, updateNode]);
 
+  // 连接节点（重新指定父节点）
   const onConnect = useCallback((params) => {
     const { source, target } = params;
-    if (wouldCreateCycle(storeNodes, source, target)) {
-      alert('不能形成循环引用');
-      return;
+    // 允许连接到根节点（agent类型）或其他对话节点
+    const targetNode = storeNodes.find(n => n.id === target);
+    if (!targetNode) return;
+    
+    // 检查循环：只有目标节点是对话节点时才检查（根节点不会造成循环）
+    if (targetNode.type !== 'agent') {
+      if (wouldCreateCycle(storeNodes, source, target)) {
+        alert('不能形成循环引用');
+        return;
+      }
     }
     updateNode(source, { parentId: target });
-    const targetNode = storeNodes.find(n => n.id === target);
     let newAgentId = null;
     if (targetNode.type === 'agent') {
       newAgentId = target;
@@ -153,6 +119,44 @@ export default function App() {
       updateNode(source, { agentId: newAgentId });
     }
   }, [storeNodes, updateNode]);
+
+  // 双击连线：删除连线，子节点变为自由节点
+  const onEdgeDoubleClick = useCallback((event, edge) => {
+    const childId = edge.source;
+    updateNode(childId, { parentId: null });
+    alert('连线已删除，该节点及其子节点现在为自由节点，可重新连接');
+  }, [updateNode]);
+
+  // 复制节点
+  const handleCopyNode = useCallback(() => {
+    if (!menu || !reactFlowInstance) return;
+    const nodeId = menu.nodeId;
+    const originalNode = storeNodes.find(n => n.id === nodeId);
+    if (!originalNode) return;
+    if (originalNode.type === 'agent') {
+      alert('不能复制 Agent 根节点');
+      return;
+    }
+    // 获取当前鼠标位置（相对于画布）
+    const position = reactFlowInstance.screenToFlowPosition({
+      x: menu.x,
+      y: menu.y,
+    });
+    const newNodeId = uuidv4();
+    const newNode = {
+      id: newNodeId,
+      type: 'conversation',
+      parentId: null,           // 自由节点
+      agentId: originalNode.agentId,
+      question: originalNode.question,
+      answer: '',               // 清空回答，用户可重新发送
+      hidden: originalNode.hidden,
+      isAutoCreated: false,
+      position: position,
+    };
+    addNode(newNode);
+    closeMenu();
+  }, [menu, storeNodes, addNode, reactFlowInstance]);
 
   const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
@@ -210,17 +214,16 @@ export default function App() {
   return (
     <div className="w-full h-screen">
       <Toolbar />
-      <HistorySidebar />
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
-        onEdgeDoubleClick={onEdgeDoubleClick}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeContextMenu={onNodeContextMenu}
+        onEdgeDoubleClick={onEdgeDoubleClick}
         onInit={setReactFlowInstance}
         nodeTypes={nodeTypes}
         connectionLineType={ConnectionLineType.Bezier}
@@ -230,7 +233,7 @@ export default function App() {
         <Controls />
         <MiniMap />
         <Panel position="top-right" className="bg-white p-2 rounded shadow text-xs">
-          提示：双击节点创建子对话 | 拖拽连线重设父节点 | 右键节点操作
+          提示：双击节点创建子对话 | 拖拽连线重设父节点 | 双击连线删除 | 右键节点操作
         </Panel>
       </ReactFlow>
       {menu && (
@@ -242,6 +245,7 @@ export default function App() {
           onHide={handleHide}
           onShow={handleShow}
           onDelete={handleDelete}
+          onCopy={handleCopyNode}
         />
       )}
     </div>
