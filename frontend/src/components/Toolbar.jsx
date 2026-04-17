@@ -1,9 +1,8 @@
 import React from 'react';
 import useStore from '../store';
-import { v4 as uuidv4 } from 'uuid';
 
 export default function Toolbar() {
-  const { autoNodeEnabled, toggleAutoNode, nodes, setNodes, saveCurrentToHistory, addNode } = useStore();
+  const { autoNodeEnabled, toggleAutoNode, nodes, setNodes, saveCurrentToHistory } = useStore();
 
   const handleNewConversation = () => {
     // 保存当前画布到历史（如果有对话节点）
