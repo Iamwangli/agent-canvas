@@ -73,7 +73,7 @@ const useStore = create(
     }),
     {
       name: 'agent-canvas-storage',
-      getStorage: () => localStorage,
+      storage: localStorage,
     }
   )
 );
