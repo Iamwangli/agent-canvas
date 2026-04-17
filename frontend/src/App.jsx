@@ -97,18 +97,21 @@ export default function App() {
   // 连接节点（重新指定父节点）
   const onConnect = useCallback((params) => {
     const { source, target } = params;
-    // 允许连接到根节点（agent类型）或其他对话节点
     const targetNode = storeNodes.find(n => n.id === target);
     if (!targetNode) return;
     
-    // 检查循环：只有目标节点是对话节点时才检查（根节点不会造成循环）
+    // 允许连接到 Agent 根节点，无需循环检测
     if (targetNode.type !== 'agent') {
       if (wouldCreateCycle(storeNodes, source, target)) {
         alert('不能形成循环引用');
         return;
       }
     }
+    
+    // 更新父节点
     updateNode(source, { parentId: target });
+    
+    // 确定 agentId
     let newAgentId = null;
     if (targetNode.type === 'agent') {
       newAgentId = target;
@@ -127,7 +130,7 @@ export default function App() {
     alert('连线已删除，该节点及其子节点现在为自由节点，可重新连接');
   }, [updateNode]);
 
-  // 复制节点
+  // 复制节点（保留原回复）
   const handleCopyNode = useCallback(() => {
     if (!menu || !reactFlowInstance) return;
     const nodeId = menu.nodeId;
@@ -146,10 +149,10 @@ export default function App() {
     const newNode = {
       id: newNodeId,
       type: 'conversation',
-      parentId: null,           // 自由节点
+      parentId: null,                      // 自由节点
       agentId: originalNode.agentId,
       question: originalNode.question,
-      answer: '',               // 清空回答，用户可重新发送
+      answer: originalNode.answer,        // 保留原回复
       hidden: originalNode.hidden,
       isAutoCreated: false,
       position: position,
