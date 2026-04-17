@@ -89,6 +89,45 @@ export default function App() {
     setEdges(flowEdges);
   }, [storeNodes, setNodesFlow, setEdges]);
 
+  const onEdgeDoubleClick = useCallback((event, edge) => {
+    // edge.source 是子节点，edge.target 是父节点
+    const childId = edge.source;
+    // 将该子节点的 parentId 设为 null，使其成为自由节点
+    updateNode(childId, { parentId: null });
+    // 注意：后代节点无需修改，它们仍然指向该子节点，但由于子节点已无父节点，整个子树成为自由树
+    alert('连线已删除，该节点及其子节点现在为自由节点，可重新连接');
+  }, [updateNode]);
+
+  // 复制节点
+  const handleCopyNode = useCallback(() => {
+    if (!menu) return;
+    const nodeId = menu.nodeId;
+    const originalNode = storeNodes.find(n => n.id === nodeId);
+    if (!originalNode) return;
+    if (originalNode.type === 'agent') {
+      alert('不能复制 Agent 根节点');
+      return;
+    }
+    const newNodeId = uuidv4();
+    const newPosition = {
+      x: originalNode.position.x + 30,
+      y: originalNode.position.y + 30,
+    };
+    const newNode = {
+      id: newNodeId,
+      type: 'conversation',
+      parentId: null,
+      agentId: originalNode.agentId,
+      question: originalNode.question,
+      answer: '',
+      hidden: originalNode.hidden,
+      isAutoCreated: false,
+      position: newPosition,
+    };
+    addNode(newNode);
+    closeMenu();
+  }, [menu, storeNodes, addNode]);
+
   const onNodeDragStop = useCallback((_, node) => {
     const existing = storeNodes.find(n => n.id === node.id);
     if (existing && (existing.position.x !== node.position.x || existing.position.y !== node.position.y)) {
@@ -176,6 +215,7 @@ export default function App() {
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
+        onEdgeDoubleClick={onEdgeDoubleClick}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}

@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 
-export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, onShow }) {
+export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy }) {
   useEffect(() => {
     const handleClickOutside = () => onClose();
     document.addEventListener('click', handleClickOutside);
@@ -13,6 +13,9 @@ export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, o
       style={{ top: y, left: x }}
       onClick={(e) => e.stopPropagation()}
     >
+      <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onCopy}>
+        复制节点
+      </button>
       <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onHide}>
         隐藏节点
       </button>
