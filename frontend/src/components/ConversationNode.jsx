@@ -61,7 +61,7 @@ export default function ConversationNode({ id, data }) {
 
   if (data.answer) {
     return (
-      <div className={`conversation-node ${data.hidden ? 'hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''}`}>
+      <div className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''}`}>
         <Handle type="target" position={Position.Top} id="target" />
         <div className="p-2 border-b bg-gray-50 text-sm font-medium">问题</div>
         <div className="p-2 text-sm whitespace-pre-wrap">{data.question}</div>

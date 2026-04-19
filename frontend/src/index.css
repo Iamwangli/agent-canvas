@@ -23,8 +23,8 @@
   min-height: 100px;
 }
 
-.conversation-node.hidden {
-  @apply border-2 border-dashed border-gray-400 bg-gray-50 opacity-80;
+.conversation-node.node-hidden {
+  @apply border-2 border-dashed border-gray-500 bg-gray-100 opacity-80;
 }
 
 .conversation-node.auto-created {
