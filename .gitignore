@@ -58,3 +58,6 @@ coverage/
 
 # 可选：如果使用 Docker，排除镜像/卷
 docker-compose.override.yml
+
+# 其他
+agent-canvas-code.txt
