@@ -1,4 +1,3 @@
-// frontend/src/components/ConversationNode.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Handle, Position } from 'reactflow';
 import ReactMarkdown from 'react-markdown';
@@ -10,7 +9,7 @@ export default function ConversationNode({ id, data }) {
   const [question, setQuestion] = useState(data.question || '');
   const [isEditing, setIsEditing] = useState(!data.answer);
   const [isSending, setIsSending] = useState(false);
-  const [attachedFile, setAttachedFile] = useState(null); // { name, content }
+  const [attachedFile, setAttachedFile] = useState(null);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -42,7 +41,7 @@ export default function ConversationNode({ id, data }) {
       });
     };
     reader.readAsText(file, 'UTF-8');
-    e.target.value = ''; // 允许重复上传
+    e.target.value = '';
   };
 
   const removeAttachedFile = () => {
@@ -50,7 +49,6 @@ export default function ConversationNode({ id, data }) {
   };
 
   const handleSend = async () => {
-    // 允许只上传文件不输入问题
     if (!question.trim() && !attachedFile) return;
     if (isSending) return;
 
@@ -74,19 +72,20 @@ export default function ConversationNode({ id, data }) {
         updateNode(id, { agentId });
       }
 
-      // 构造最终问题：如果有文件，将内容附在问题后
-      let finalQuestion = question;
+      // 构造发送给 API 的问题（包含文件内容），但节点存储纯问题
+      let apiQuestion = question;
       if (attachedFile) {
         const fileInfo = `\n\n[上传文件：${attachedFile.name}]\n内容：\n${attachedFile.content}`;
-        finalQuestion = question ? question + fileInfo : `请分析以下文件内容：\n${attachedFile.content}`;
+        apiQuestion = question ? question + fileInfo : `请分析以下文件内容：\n${attachedFile.content}`;
       }
 
-      const { answer, autoAction } = await sendMessage(agentId, finalQuestion, context);
-      updateNode(id, { question: finalQuestion, answer });
+      const { answer, autoAction } = await sendMessage(agentId, apiQuestion, context);
+      
+      // 节点只保存用户输入的问题文本，不包含文件内容
+      updateNode(id, { question, answer });
       setIsEditing(false);
-      setAttachedFile(null); // 清空文件
+      setAttachedFile(null);
 
-      // 自动节点逻辑保持不变
       if (autoNodeEnabled && autoAction) {
         const parentNode = allNodes.find(n => n.id === node.parentId) || node;
         const currentCount = getAutoCount(parentNode.id);
@@ -123,7 +122,6 @@ export default function ConversationNode({ id, data }) {
     }
   };
 
-  // 只读状态
   if (data.answer) {
     return (
       <div className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''}`}>
@@ -147,7 +145,6 @@ export default function ConversationNode({ id, data }) {
     );
   }
 
-  // 编辑状态
   return (
     <div className="conversation-node">
       <Handle type="target" position={Position.Top} id="target-top" style={{ background: '#9ca3af' }} />
@@ -172,7 +169,6 @@ export default function ConversationNode({ id, data }) {
         />
       </div>
 
-      {/* 显示已上传文件 */}
       {attachedFile && (
         <div className="px-2 pt-1">
           <div className="flex items-center justify-between bg-gray-100 rounded px-2 py-1 text-xs">
