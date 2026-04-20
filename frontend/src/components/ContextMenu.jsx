@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy, onCreateChild }) {
+export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy, onCreateChild, isHidden }) {
   const [showDirectionMenu, setShowDirectionMenu] = useState(false);
 
   useEffect(() => {
@@ -28,9 +28,9 @@ export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, o
       <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onCopy}>
         复制节点
       </button>
-      
+
       <div className="relative">
-        <button 
+        <button
           className="block w-full text-left px-4 py-1 hover:bg-gray-100 flex justify-between items-center"
           onClick={handleCreateChildClick}
         >
@@ -38,7 +38,7 @@ export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, o
           <span className="text-gray-400">▶</span>
         </button>
         {showDirectionMenu && (
-          <div 
+          <div
             className="absolute left-full top-0 ml-1 bg-white border rounded shadow-lg py-1 w-24 z-30"
             onClick={(e) => e.stopPropagation()}
           >
@@ -57,13 +57,17 @@ export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, o
           </div>
         )}
       </div>
-      
-      <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onHide}>
-        隐藏节点
-      </button>
-      <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onShow}>
-        取消隐藏
-      </button>
+
+      {isHidden ? (
+        <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onShow}>
+          取消隐藏
+        </button>
+      ) : (
+        <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onHide}>
+          隐藏节点
+        </button>
+      )}
+
       <hr className="my-1" />
       <button className="block w-full text-left px-4 py-1 hover:bg-gray-100 text-red-600" onClick={onDelete}>
         删除节点

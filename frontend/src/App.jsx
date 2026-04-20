@@ -1,4 +1,3 @@
-// frontend/src/App.jsx
 import React, { useCallback, useEffect, useState } from 'react';
 import ReactFlow, {
   Background,
@@ -9,8 +8,6 @@ import ReactFlow, {
   ConnectionLineType,
   Panel,
   addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import useStore from './store';
@@ -26,6 +23,14 @@ import { v4 as uuidv4 } from 'uuid';
 const nodeTypes = {
   agent: AgentNode,
   conversation: ConversationNode,
+};
+
+// 方向 → 子节点 sourceHandle / 父节点 targetHandle 映射
+const DIRECTION_HANDLE_MAP = {
+  top:    { source: 'source-bottom', target: 'target-top' },
+  bottom: { source: 'source-top',    target: 'target-bottom' },
+  left:   { source: 'source-right',  target: 'target-left' },
+  right:  { source: 'source-left',   target: 'target-right' },
 };
 
 export default function App() {
@@ -48,7 +53,6 @@ export default function App() {
 
   const currentNodes = getCurrentNodes();
 
-  // 将 currentNodes 映射为 React Flow 节点（只做单向同步：数据 -> 视图）
   useEffect(() => {
     const flowNodes = currentNodes.map(node => ({
       id: node.id,
@@ -59,10 +63,8 @@ export default function App() {
     setNodes(flowNodes);
   }, [currentNodes, setNodes]);
 
-  // 同步边：根据 currentNodes 中的 parentId 增量更新 edges
   useEffect(() => {
     setEdges(prevEdges => {
-      // 构建基于 currentNodes 的期望边映射（source -> target）
       const expectedEdgesMap = new Map();
       currentNodes.forEach(node => {
         if (node.parentId && node.type !== 'agent') {
@@ -80,7 +82,6 @@ export default function App() {
       const newEdges = [];
       const existingEdgesMap = new Map(prevEdges.map(e => [`${e.source}->${e.target}`, e]));
 
-      // 遍历期望的边，保留已有的 Handle 信息
       for (const [key, expectedEdge] of expectedEdgesMap.entries()) {
         const existing = existingEdgesMap.get(key);
         newEdges.push({
@@ -94,7 +95,6 @@ export default function App() {
     });
   }, [currentNodes, setEdges]);
 
-  // 初始化 Agent 根节点
   useEffect(() => {
     if (!initialized) return;
     const hasAgentRoot = currentNodes.some(n => n.type === 'agent');
@@ -127,7 +127,6 @@ export default function App() {
     }
   }, [initialized]);
 
-  // 监听自动创建节点事件（略，保持不变）
   useEffect(() => {
     const handleAutoCreate = (event) => {
       const { parentId, agentName, question } = event.detail;
@@ -172,28 +171,23 @@ export default function App() {
 
   const onConnect = useCallback((params) => {
     const { source, target, sourceHandle, targetHandle } = params;
-
     const sourceNode = currentNodes.find(n => n.id === source);
     const targetNode = currentNodes.find(n => n.id === target);
 
     if (!sourceNode || !targetNode) return;
 
-    // 禁止 Agent 作为 source（父不能连向子）
     if (sourceNode.type === 'agent') {
       alert('连线方向错误：请从子节点拖向父节点');
       return;
     }
 
-    // 循环检测
     if (wouldCreateCycle(currentNodes, source, target)) {
       alert('不能将节点连接到其后代，这会形成循环。');
       return;
     }
 
-    // 更新节点 parentId（这会触发边的 useEffect 更新）
     updateNode(source, { parentId: target });
 
-    // 同时直接添加边到 edges 状态（携带 Handle 信息），避免等待 useEffect
     setEdges(eds => addEdge({
       ...params,
       id: `${source}-${target}`,
@@ -201,21 +195,14 @@ export default function App() {
       animated: sourceNode.isAutoCreated || false,
     }, eds));
 
-    // 更新 agentId
-    let newAgentId = null;
-    if (targetNode.type === 'agent') {
-      newAgentId = targetNode.id;
-    } else {
-      newAgentId = targetNode.agentId;
-    }
+    let newAgentId = targetNode.type === 'agent' ? targetNode.id : targetNode.agentId;
     if (newAgentId) {
       updateNode(source, { agentId: newAgentId });
     }
   }, [currentNodes, updateNode, setEdges]);
 
   const onEdgeDoubleClick = useCallback((event, edge) => {
-    const childId = edge.source;
-    updateNode(childId, { parentId: null });
+    updateNode(edge.source, { parentId: null });
     setEdges(eds => eds.filter(e => e.id !== edge.id));
     alert('连线已删除，该节点现在为自由节点，可重新连接');
   }, [updateNode, setEdges]);
@@ -297,17 +284,18 @@ export default function App() {
     }
 
     let newPosition = { ...parentNode.position };
-    const offset = 200;
+    const offset = 220;
     switch (direction) {
-      case 'top': newPosition.y -= offset; break;
-      case 'right': newPosition.x += offset; break;
+      case 'top':    newPosition.y -= offset; break;
       case 'bottom': newPosition.y += offset; break;
-      case 'left': newPosition.x -= offset; break;
-      default: newPosition.y += offset;
+      case 'left':   newPosition.x -= offset; break;
+      case 'right':  newPosition.x += offset; break;
+      default:       newPosition.y += offset;
     }
 
+    const newNodeId = uuidv4();
     const newNode = {
-      id: uuidv4(),
+      id: newNodeId,
       type: 'conversation',
       parentId,
       agentId: parentNode.type === 'agent' ? parentNode.id : parentNode.agentId,
@@ -319,8 +307,21 @@ export default function App() {
     };
 
     addNode(newNode);
+
+    // 根据方向建立连线（使用修正后的映射）
+    const { source, target } = DIRECTION_HANDLE_MAP[direction] || DIRECTION_HANDLE_MAP.bottom;
+    setEdges(eds => addEdge({
+      id: `${newNodeId}-${parentId}`,
+      source: newNodeId,
+      target: parentId,
+      sourceHandle: source,
+      targetHandle: target,
+      type: 'smoothstep',
+      animated: false,
+    }, eds));
+
     closeMenu();
-  }, [menu, currentNodes, addNode]);
+  }, [menu, currentNodes, addNode, setEdges]);
 
   const onNodeDoubleClick = useCallback((event, node) => {
     if (node.type === 'conversation' && !node.data.answer) {
@@ -329,7 +330,7 @@ export default function App() {
     }
 
     const newId = uuidv4();
-    const newPosition = { x: node.position.x, y: node.position.y + 120 };
+    const newPosition = { x: node.position.x, y: node.position.y + 220 };
     const newNode = {
       id: newId,
       type: 'conversation',
@@ -342,7 +343,18 @@ export default function App() {
       position: newPosition,
     };
     addNode(newNode);
-  }, [addNode]);
+
+    // 默认在下方创建，连线：子节点 top → 父节点 bottom
+    setEdges(eds => addEdge({
+      id: `${newId}-${node.id}`,
+      source: newId,
+      target: node.id,
+      sourceHandle: 'source-top',
+      targetHandle: 'target-bottom',
+      type: 'smoothstep',
+      animated: false,
+    }, eds));
+  }, [addNode, setEdges]);
 
   return (
     <div className="w-full h-screen">
@@ -385,6 +397,7 @@ export default function App() {
           onDelete={handleDelete}
           onCopy={handleCopyNode}
           onCreateChild={handleCreateChild}
+          isHidden={currentNodes.find(n => n.id === menu.nodeId)?.hidden || false}
         />
       )}
     </div>
