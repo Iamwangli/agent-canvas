@@ -26,13 +26,19 @@ export default function ConversationNode({ id, data }) {
     }
   }, [isEditing]);
 
+  // 允许的文本文件扩展名
+  const TEXT_FILE_EXTENSIONS = ['.txt', '.md', '.json', '.log', '.csv', '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.c', '.cpp', '.h', '.html', '.css', '.xml', '.yaml', '.yml', '.sh', '.bat', '.ini', '.cfg', '.conf'];
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!file.name.endsWith('.txt')) {
-      alert('仅支持 .txt 文件');
+    const fileName = file.name.toLowerCase();
+    const isTextFile = TEXT_FILE_EXTENSIONS.some(ext => fileName.endsWith(ext));
+    if (!isTextFile) {
+      alert('仅支持文本文件（如 .txt, .md, .json, .csv, .log, .js, .py 等）');
       return;
     }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       setAttachedFile({
@@ -58,6 +64,13 @@ export default function ConversationNode({ id, data }) {
       const node = allNodes.find(n => n.id === id);
       if (!node) return;
 
+      // 新增：检查孤立节点
+      if (!node.parentId) {
+        alert('此节点没有父节点，请先连接到 Agent 根节点或其他对话节点。');
+        setIsSending(false);
+        return;
+      }
+
       const context = collectContext(allNodes, node.parentId);
 
       let agentId = node.agentId;
@@ -72,7 +85,6 @@ export default function ConversationNode({ id, data }) {
         updateNode(id, { agentId });
       }
 
-      // 构造发送给 API 的问题（包含文件内容），但节点存储纯问题
       let apiQuestion = question;
       if (attachedFile) {
         const fileInfo = `\n\n[上传文件：${attachedFile.name}]\n内容：\n${attachedFile.content}`;
@@ -81,7 +93,6 @@ export default function ConversationNode({ id, data }) {
 
       const { answer, autoAction } = await sendMessage(agentId, apiQuestion, context);
       
-      // 节点只保存用户输入的问题文本，不包含文件内容
       updateNode(id, { question, answer });
       setIsEditing(false);
       setAttachedFile(null);
