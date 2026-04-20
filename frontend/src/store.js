@@ -5,14 +5,12 @@ import { v4 as uuidv4 } from 'uuid';
 const useStore = create(
   persist(
     (set, get) => ({
-      // 文件列表
       files: [],
-      // 当前文件 ID
       currentFileId: null,
-      // AI 自动节点开关
       autoNodeEnabled: true,
+      // 记录每个父节点下的自动创建次数
+      autoCreateCounts: {},
 
-      // 初始化：如果没有任何文件，创建一个默认的空白文件
       init: () => {
         const { files, currentFileId } = get();
         if (files.length === 0) {
@@ -24,14 +22,12 @@ const useStore = create(
         }
       },
 
-      // 获取当前文件的节点
       getCurrentNodes: () => {
         const { files, currentFileId } = get();
         const file = files.find(f => f.id === currentFileId);
         return file ? file.nodes : [];
       },
 
-      // 更新当前文件的节点（任何修改都调用此方法，自动持久化）
       updateCurrentNodes: (nodes) => {
         const { files, currentFileId } = get();
         if (!currentFileId) return;
@@ -41,7 +37,6 @@ const useStore = create(
         set({ files: updatedFiles });
       },
 
-      // 创建新文件（新对话时调用）
       createNewFile: () => {
         const { files } = get();
         const newId = uuidv4();
@@ -58,7 +53,6 @@ const useStore = create(
         return newId;
       },
 
-      // 恢复历史文件
       restoreFile: (fileId) => {
         const { files } = get();
         const file = files.find(f => f.id === fileId);
@@ -67,7 +61,6 @@ const useStore = create(
         }
       },
 
-      // 删除文件
       deleteFile: (fileId) => {
         const { files, currentFileId } = get();
         if (files.length === 1) {
@@ -82,51 +75,87 @@ const useStore = create(
         set({ files: newFiles, currentFileId: newCurrentId });
       },
 
-      // 更新文件名
       updateFileName: (fileId, newName) => {
         set((state) => ({
           files: state.files.map(f => f.id === fileId ? { ...f, name: newName } : f)
         }));
       },
 
-      // 获取当前文件对象
       getCurrentFile: () => {
         const { files, currentFileId } = get();
         return files.find(f => f.id === currentFileId);
       },
 
-      // 以下为原有的节点操作方法，自动更新当前文件
       addNode: (node) => {
         const nodes = get().getCurrentNodes();
         const newNodes = [...nodes, node];
         get().updateCurrentNodes(newNodes);
       },
+      
       updateNode: (id, updates) => {
         const nodes = get().getCurrentNodes();
         const newNodes = nodes.map(n => n.id === id ? { ...n, ...updates } : n);
         get().updateCurrentNodes(newNodes);
       },
+      
       deleteNode: (id) => {
         const nodes = get().getCurrentNodes();
         const node = nodes.find(n => n.id === id);
         if (!node || node.type === 'agent') return;
+        
         const parentId = node.parentId;
+        
+        // 处理子节点：将其 parentId 改为被删除节点的 parentId
         const newNodes = nodes.map(n => {
           if (n.parentId === id) {
             return { ...n, parentId: parentId };
           }
           return n;
         }).filter(n => n.id !== id);
+        
         get().updateCurrentNodes(newNodes);
       },
+      
       setNodes: (nodes) => {
         get().updateCurrentNodes(nodes);
       },
+      
       toggleAutoNode: () => set((state) => ({ autoNodeEnabled: !state.autoNodeEnabled })),
+      
+      // 自动节点计数方法
+      incrementAutoCount: (parentId) => {
+        set((state) => ({
+          autoCreateCounts: {
+            ...state.autoCreateCounts,
+            [parentId]: (state.autoCreateCounts[parentId] || 0) + 1
+          }
+        }));
+      },
+      
+      getAutoCount: (parentId) => {
+        return get().autoCreateCounts[parentId] || 0;
+      },
+      
+      resetAutoCount: (parentId) => {
+        set((state) => ({
+          autoCreateCounts: {
+            ...state.autoCreateCounts,
+            [parentId]: 0
+          }
+        }));
+      },
+      
+      // 添加自动创建的节点（并增加计数）
+      addAutoNode: (node, parentId) => {
+        const nodes = get().getCurrentNodes();
+        const newNodes = [...nodes, node];
+        get().updateCurrentNodes(newNodes);
+        get().incrementAutoCount(parentId);
+      },
     }),
     {
-      name: 'agent-canvas-files',   // localStorage 的 key
-      storage: localStorage,         // 新版 API，消除弃用警告
+      name: 'agent-canvas-files',
+      storage: localStorage,
     }
   )
 );

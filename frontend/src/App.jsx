@@ -7,6 +7,7 @@ import ReactFlow, {
   useEdgesState,
   ConnectionLineType,
   Panel,
+  addEdge,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import useStore from './store';
@@ -34,6 +35,7 @@ export default function App() {
     deleteNode, 
     autoNodeEnabled,
     currentFileId,
+    addAutoNode,
   } = useStore();
   const [nodes, setNodesFlow, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -41,15 +43,14 @@ export default function App() {
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
   const [initialized, setInitialized] = useState(false);
 
-  // 初始化 store（创建默认文件）
+  // 初始化 store
   useEffect(() => {
     init();
   }, [init]);
 
-  // 获取当前节点（每次渲染重新获取）
   const currentNodes = getCurrentNodes();
 
-  // 同步 currentNodes 到 ReactFlow 并生成边
+  // 同步 currentNodes 到 ReactFlow
   useEffect(() => {
     const flowNodes = currentNodes.map(node => ({
       id: node.id,
@@ -62,16 +63,16 @@ export default function App() {
     const flowEdges = currentNodes
       .filter(node => node.parentId && node.type !== 'agent')
       .map(node => ({
-        id: `${node.parentId}-${node.id}`,
+        id: `${node.id}-${node.parentId}`,
         source: node.id,
         target: node.parentId,
         type: 'smoothstep',
-        animated: false,
+        animated: node.isAutoCreated,
       }));
     setEdges(flowEdges);
   }, [currentNodes, setNodesFlow, setEdges]);
 
-  // 初始化 Agent 根节点（如果当前文件没有根节点）
+  // 初始化 Agent 根节点
   useEffect(() => {
     if (!initialized) return;
     const hasAgentRoot = currentNodes.some(n => n.type === 'agent');
@@ -96,7 +97,6 @@ export default function App() {
     }
   }, [initialized, currentNodes, updateCurrentNodes]);
 
-  // 加载 agents 完成标记
   useEffect(() => {
     if (!initialized) {
       getAgents()
@@ -105,7 +105,47 @@ export default function App() {
     }
   }, [initialized]);
 
-  // 以下所有 useCallback 依赖 currentNodes 或 updateNode 等，定义在 currentNodes 声明之后
+  // 监听自动创建节点事件
+  useEffect(() => {
+    const handleAutoCreate = (event) => {
+      const { parentId, agentName, question } = event.detail;
+      if (!autoNodeEnabled) return;
+      
+      // 查找目标 Agent 的 ID
+      const agentNode = currentNodes.find(n => n.type === 'agent' && n.name === agentName);
+      if (!agentNode) {
+        console.warn(`Agent "${agentName}" not found`);
+        return;
+      }
+      
+      const parentNode = currentNodes.find(n => n.id === parentId);
+      if (!parentNode) return;
+      
+      // 计算新节点位置（默认放在父节点下方）
+      const newPosition = {
+        x: parentNode.position.x,
+        y: parentNode.position.y + 150,
+      };
+      
+      const newNode = {
+        id: uuidv4(),
+        type: 'conversation',
+        parentId: parentId,
+        agentId: agentNode.id,
+        question: question,
+        answer: '',
+        hidden: false,
+        isAutoCreated: true,
+        position: newPosition,
+      };
+      
+      addAutoNode(newNode, parentId);
+    };
+    
+    window.addEventListener('auto-create-node', handleAutoCreate);
+    return () => window.removeEventListener('auto-create-node', handleAutoCreate);
+  }, [currentNodes, autoNodeEnabled, addAutoNode]);
+
   const onNodeDragStop = useCallback((_, node) => {
     const existing = currentNodes.find(n => n.id === node.id);
     if (existing && (existing.position.x !== node.position.x || existing.position.y !== node.position.y)) {
@@ -114,20 +154,33 @@ export default function App() {
   }, [currentNodes, updateNode]);
 
   const onConnect = useCallback((params) => {
-    const { source, target } = params;
-    const targetNode = currentNodes.find(n => n.id === target);
-    if (!targetNode) return;
+    const { source, target, sourceHandle, targetHandle } = params;
     
-    if (targetNode.type !== 'agent') {
-      if (wouldCreateCycle(currentNodes, source, target)) {
-        alert('不能形成循环引用');
-        return;
-      }
+    // 方向校验：source 必须是子节点（conversation），target 可以是任何节点
+    const sourceNode = currentNodes.find(n => n.id === source);
+    const targetNode = currentNodes.find(n => n.id === target);
+    
+    if (!sourceNode || !targetNode) return;
+    
+    // 禁止 Agent 作为 source（父不能连向子）
+    if (sourceNode.type === 'agent') {
+      alert('连线方向错误：请从子节点拖向父节点');
+      return;
     }
+    
+    // 禁止循环
+    if (wouldCreateCycle(currentNodes, source, target)) {
+      alert('不能将节点连接到其后代，这会形成循环。');
+      return;
+    }
+    
+    // 更新父节点
     updateNode(source, { parentId: target });
+    
+    // 更新 agentId
     let newAgentId = null;
     if (targetNode.type === 'agent') {
-      newAgentId = target;
+      newAgentId = targetNode.id;
     } else {
       newAgentId = targetNode.agentId;
     }
@@ -139,9 +192,10 @@ export default function App() {
   const onEdgeDoubleClick = useCallback((event, edge) => {
     const childId = edge.source;
     updateNode(childId, { parentId: null });
-    alert('连线已删除，该节点及其子节点现在为自由节点，可重新连接');
+    alert('连线已删除，该节点现在为自由节点，可重新连接');
   }, [updateNode]);
 
+  // 复制节点
   const handleCopyNode = useCallback(() => {
     if (!menu || !reactFlowInstance) return;
     const nodeId = menu.nodeId;
@@ -171,33 +225,114 @@ export default function App() {
     closeMenu();
   }, [menu, currentNodes, addNode, reactFlowInstance]);
 
+  // 右键菜单
   const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault();
-    if (node.type === 'agent') return;
+    if (node.type === 'agent') return; // Agent 不显示右键菜单
     setMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
   }, []);
 
   const closeMenu = () => setMenu(null);
+  
   const handleHide = () => {
     if (menu) {
       updateNode(menu.nodeId, { hidden: true });
       closeMenu();
     }
   };
+  
   const handleShow = () => {
     if (menu) {
       updateNode(menu.nodeId, { hidden: false });
       closeMenu();
     }
   };
+  
   const handleDelete = () => {
-    if (menu) {
-      deleteNode(menu.nodeId);
+    if (!menu) return;
+    const nodeId = menu.nodeId;
+    const node = currentNodes.find(n => n.id === nodeId);
+    if (!node) return;
+    if (node.type === 'agent') {
+      alert('不能删除 Agent 根节点');
       closeMenu();
+      return;
     }
+    
+    const confirmMsg = `删除节点后，其子节点将自动连接到上级节点。确定删除吗？`;
+    if (!window.confirm(confirmMsg)) {
+      closeMenu();
+      return;
+    }
+    
+    deleteNode(nodeId);
+    closeMenu();
   };
 
+  // 创建子节点（方向）
+  const handleCreateChild = useCallback((direction) => {
+    if (!menu) return;
+    const parentId = menu.nodeId;
+    const parentNode = currentNodes.find(n => n.id === parentId);
+    if (!parentNode) return;
+    
+    // 检查父节点是否已回复（conversation 节点需有 answer，agent 节点直接允许）
+    if (parentNode.type === 'conversation' && !parentNode.answer) {
+      alert('不能从未回复的节点创建子节点');
+      return;
+    }
+    
+    // 计算新节点位置
+    let newPosition = { ...parentNode.position };
+    const offset = 200;
+    switch (direction) {
+      case 'top':
+        newPosition.y -= offset;
+        break;
+      case 'right':
+        newPosition.x += offset;
+        break;
+      case 'bottom':
+        newPosition.y += offset;
+        break;
+      case 'left':
+        newPosition.x -= offset;
+        break;
+      default:
+        newPosition.y += offset;
+    }
+    
+    const newNodeId = uuidv4();
+    let agentId = null;
+    if (parentNode.type === 'agent') {
+      agentId = parentNode.id;
+    } else {
+      agentId = parentNode.agentId;
+    }
+    
+    const newNode = {
+      id: newNodeId,
+      type: 'conversation',
+      parentId: parentId,
+      agentId: agentId,
+      question: '',
+      answer: '',
+      hidden: false,
+      isAutoCreated: false,
+      position: newPosition,
+    };
+    
+    addNode(newNode);
+    closeMenu();
+  }, [menu, currentNodes, addNode]);
+
   const onNodeDoubleClick = useCallback((event, node) => {
+    // 检查是否允许创建子节点（对于 conversation，需要已回复）
+    if (node.type === 'conversation' && !node.data.answer) {
+      alert('不能从未回复的节点创建子节点');
+      return;
+    }
+    
     const newId = uuidv4();
     const newPosition = {
       x: node.position.x,
@@ -242,6 +377,11 @@ export default function App() {
         nodeTypes={nodeTypes}
         connectionLineType={ConnectionLineType.Bezier}
         fitView
+        isValidConnection={(connection) => {
+          // 额外的前置校验：禁止从 agent 作为 source
+          const sourceNode = currentNodes.find(n => n.id === connection.source);
+          return sourceNode?.type !== 'agent';
+        }}
       >
         <Background gap={20} size={1} />
         <Controls />
@@ -260,6 +400,7 @@ export default function App() {
           onShow={handleShow}
           onDelete={handleDelete}
           onCopy={handleCopyNode}
+          onCreateChild={handleCreateChild}
         />
       )}
     </div>
