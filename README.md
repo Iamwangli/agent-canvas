@@ -4,8 +4,6 @@
 
 AgentCanvas 是一个可视化的多智能体协作平台。你可以在无限画布上创建对话节点，通过树形结构构建推理链，每个节点代表一轮完整的问答。支持文件上传、节点隐藏、自动分支、多会话管理，所有数据自动保存在浏览器本地。
 
-![AgentCanvas 预览](https://via.placeholder.com/800x400?text=AgentCanvas+Screenshot)
-
 ## ✨ 核心特性
 
 - 🎨 **无限画布** — 基于 React Flow，流畅拖拽、缩放、平移
