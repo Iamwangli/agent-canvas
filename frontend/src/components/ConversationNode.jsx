@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import ReactMarkdown from 'react-markdown';
 import useStore from '../store';
 import { sendMessage } from '../api';
@@ -20,25 +20,23 @@ export default function ConversationNode({ id, data }) {
   const resetAutoCount = useStore(state => state.resetAutoCount);
   const autoNodeEnabled = useStore(state => state.autoNodeEnabled);
 
+  // 从节点数据中获取宽度，默认 280
+  const nodeWidth = data.width || 280;
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isEditing]);
 
-  // 允许的文本文件扩展名
-  const TEXT_FILE_EXTENSIONS = ['.txt', '.md', '.json', '.log', '.csv', '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.c', '.cpp', '.h', '.html', '.css', '.xml', '.yaml', '.yml', '.sh', '.bat', '.ini', '.cfg', '.conf'];
-
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const fileName = file.name.toLowerCase();
-    const isTextFile = TEXT_FILE_EXTENSIONS.some(ext => fileName.endsWith(ext));
-    if (!isTextFile) {
-      alert('仅支持文本文件（如 .txt, .md, .json, .csv, .log, .js, .py 等）');
+    const allowedExtensions = ['.txt', '.md', '.json', '.js', '.jsx', '.ts', '.tsx', '.py', '.html', '.htm', '.css', '.csv', '.xml', '.yaml', '.yml', '.log', '.sh', '.bat', '.ini', '.cfg', '.conf'];
+    if (!allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
+      alert('仅支持文本文件（如 .txt, .md, .json, .js, .py, .html, .css 等）');
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       setAttachedFile({
@@ -64,7 +62,6 @@ export default function ConversationNode({ id, data }) {
       const node = allNodes.find(n => n.id === id);
       if (!node) return;
 
-      // 新增：检查孤立节点
       if (!node.parentId) {
         alert('此节点没有父节点，请先连接到 Agent 根节点或其他对话节点。');
         setIsSending(false);
@@ -92,8 +89,18 @@ export default function ConversationNode({ id, data }) {
       }
 
       const { answer, autoAction } = await sendMessage(agentId, apiQuestion, context);
-      
-      updateNode(id, { question, answer });
+
+      const currentAttachedFiles = node.attachedFiles || [];
+      const newAttachedFiles = attachedFile
+        ? [...currentAttachedFiles, attachedFile.name]
+        : currentAttachedFiles;
+
+      updateNode(id, {
+        question,
+        answer,
+        attachedFiles: newAttachedFiles,
+      });
+
       setIsEditing(false);
       setAttachedFile(null);
 
@@ -133,9 +140,23 @@ export default function ConversationNode({ id, data }) {
     }
   };
 
+  // 只读状态
   if (data.answer) {
+    const attachedFiles = data.attachedFiles || [];
     return (
-      <div className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''}`}>
+      <div
+        className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''}`}
+        style={{ width: nodeWidth, minWidth: 200 }}
+      >
+        <NodeResizer
+          minWidth={200}
+          maxWidth={5000}
+          onResize={(_, params) => {
+            updateNode(id, { width: params.width });
+          }}
+          lineStyle={{ borderColor: 'transparent' }}
+          handleStyle={{ opacity: 0 }}
+        />
         <Handle type="target" position={Position.Top} id="target-top" style={{ background: '#9ca3af' }} />
         <Handle type="target" position={Position.Right} id="target-right" style={{ background: '#9ca3af' }} />
         <Handle type="target" position={Position.Bottom} id="target-bottom" style={{ background: '#9ca3af' }} />
@@ -143,6 +164,21 @@ export default function ConversationNode({ id, data }) {
 
         <div className="p-2 border-b bg-gray-50 text-sm font-medium">问题</div>
         <div className="p-2 text-sm whitespace-pre-wrap">{data.question}</div>
+
+        {attachedFiles.length > 0 && (
+          <div className="px-2 pb-1">
+            <div className="text-xs text-gray-500 mb-1">附件：</div>
+            <div className="flex flex-wrap gap-1">
+              {attachedFiles.map((fileName, idx) => (
+                <span key={idx} className="inline-flex items-center bg-gray-100 rounded px-2 py-0.5 text-xs">
+                  <span className="mr-1">📄</span>
+                  <span className="truncate max-w-[150px]">{fileName}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
         <div className="p-2 text-sm prose max-w-none">
           <ReactMarkdown>{data.answer}</ReactMarkdown>
@@ -156,8 +192,18 @@ export default function ConversationNode({ id, data }) {
     );
   }
 
+  // 编辑状态
   return (
-    <div className="conversation-node">
+    <div className="conversation-node" style={{ width: nodeWidth, minWidth: 200 }}>
+      <NodeResizer
+        minWidth={200}
+        maxWidth={500}
+        onResize={(_, params) => {
+          updateNode(id, { width: params.width });
+        }}
+        lineStyle={{ borderColor: 'transparent' }}
+        handleStyle={{ opacity: 0 }}
+      />
       <Handle type="target" position={Position.Top} id="target-top" style={{ background: '#9ca3af' }} />
       <Handle type="target" position={Position.Right} id="target-right" style={{ background: '#9ca3af' }} />
       <Handle type="target" position={Position.Bottom} id="target-bottom" style={{ background: '#9ca3af' }} />
@@ -175,7 +221,7 @@ export default function ConversationNode({ id, data }) {
           type="file"
           ref={fileInputRef}
           style={{ display: 'none' }}
-          accept=".txt"
+          accept=".txt,.md,.json,.js,.jsx,.ts,.tsx,.py,.html,.htm,.css,.csv,.xml,.yaml,.yml,.log,.sh,.bat,.ini,.cfg,.conf,text/plain"
           onChange={handleFileUpload}
         />
       </div>
