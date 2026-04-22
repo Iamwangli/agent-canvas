@@ -85,7 +85,7 @@ export default function ConversationNode({ id, data }) {
       let apiQuestion = question;
       if (attachedFile) {
         const fileInfo = `\n\n[上传文件：${attachedFile.name}]\n内容：\n${attachedFile.content}`;
-        apiQuestion = question ? question + fileInfo : `请分析以下文件内容：\n${attachedFile.content}`;
+        apiQuestion = question ? fileInfo + question : `请分析以上文件内容：\n${attachedFile.content}`;
       }
 
       const { answer, autoAction } = await sendMessage(agentId, apiQuestion, context);
