@@ -1,19 +1,22 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 
 const useStore = create(
   persist(
     (set, get) => ({
+      hasHydrated: false,
       files: [],
       currentFileId: null,
       autoNodeEnabled: true,
-      // 记录每个父节点下的自动创建次数
       autoCreateCounts: {},
+      flowPathNodes: [],
+      flowPathEdges: [],
 
       init: () => {
-        const { files, currentFileId } = get();
-        if (files.length === 0) {
+        const { files, hasHydrated } = get();
+        // 仅当 localStorage 恢复完毕且确实没有文件时才创建默认文件
+        if (hasHydrated && files.length === 0) {
           const newId = uuidv4();
           set({
             files: [{ id: newId, name: '未命名会话', nodes: [], createdAt: Date.now() }],
@@ -32,7 +35,7 @@ const useStore = create(
         const { files, currentFileId } = get();
         if (!currentFileId) return;
         const updatedFiles = files.map(file =>
-          file.id === currentFileId ? { ...file, nodes: nodes, updatedAt: Date.now() } : file
+          file.id === currentFileId ? { ...file, nodes, updatedAt: Date.now() } : file
         );
         set({ files: updatedFiles });
       },
@@ -88,41 +91,31 @@ const useStore = create(
 
       addNode: (node) => {
         const nodes = get().getCurrentNodes();
-        const newNodes = [...nodes, node];
-        get().updateCurrentNodes(newNodes);
+        get().updateCurrentNodes([...nodes, node]);
       },
-      
+
       updateNode: (id, updates) => {
         const nodes = get().getCurrentNodes();
         const newNodes = nodes.map(n => n.id === id ? { ...n, ...updates } : n);
         get().updateCurrentNodes(newNodes);
       },
-      
+
       deleteNode: (id) => {
         const nodes = get().getCurrentNodes();
         const node = nodes.find(n => n.id === id);
         if (!node || node.type === 'agent') return;
-        
         const parentId = node.parentId;
-        
-        // 处理子节点：将其 parentId 改为被删除节点的 parentId
         const newNodes = nodes.map(n => {
-          if (n.parentId === id) {
-            return { ...n, parentId: parentId };
-          }
+          if (n.parentId === id) return { ...n, parentId };
           return n;
         }).filter(n => n.id !== id);
-        
         get().updateCurrentNodes(newNodes);
       },
-      
-      setNodes: (nodes) => {
-        get().updateCurrentNodes(nodes);
-      },
-      
+
+      setNodes: (nodes) => get().updateCurrentNodes(nodes),
+
       toggleAutoNode: () => set((state) => ({ autoNodeEnabled: !state.autoNodeEnabled })),
-      
-      // 自动节点计数方法
+
       incrementAutoCount: (parentId) => {
         set((state) => ({
           autoCreateCounts: {
@@ -131,11 +124,9 @@ const useStore = create(
           }
         }));
       },
-      
-      getAutoCount: (parentId) => {
-        return get().autoCreateCounts[parentId] || 0;
-      },
-      
+
+      getAutoCount: (parentId) => get().autoCreateCounts[parentId] || 0,
+
       resetAutoCount: (parentId) => {
         set((state) => ({
           autoCreateCounts: {
@@ -144,18 +135,23 @@ const useStore = create(
           }
         }));
       },
-      
-      // 添加自动创建的节点（并增加计数）
+
       addAutoNode: (node, parentId) => {
         const nodes = get().getCurrentNodes();
-        const newNodes = [...nodes, node];
-        get().updateCurrentNodes(newNodes);
+        get().updateCurrentNodes([...nodes, node]);
         get().incrementAutoCount(parentId);
       },
+
+      setFlowPath: (nodeIds, edgeIds) => set({ flowPathNodes: nodeIds, flowPathEdges: edgeIds }),
+      clearFlowPath: () => set({ flowPathNodes: [], flowPathEdges: [] }),
     }),
     {
       name: 'agent-canvas-files',
-      storage: localStorage,
+      storage: createJSONStorage(() => localStorage),
+      // 修复点：localStorage 恢复完毕后设置 hasHydrated
+      onRehydrateStorage: () => (state) => {
+        state.hasHydrated = true;
+      },
     }
   )
 );

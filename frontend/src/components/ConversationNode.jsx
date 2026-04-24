@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Handle, Position, NodeResizer } from 'reactflow';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Handle, Position, NodeResizer, useReactFlow } from 'reactflow';
 import ReactMarkdown from 'react-markdown';
 import useStore from '../store';
 import { sendMessage } from '../api';
-import { collectContext, findNearestAgentId } from '../utils/graphUtils';
+import { collectContext, findNearestAgentId, getAncestorPath } from '../utils/graphUtils';
+
+const MAX_NODE_WIDTH = 1000;
 
 export default function ConversationNode({ id, data }) {
   const [question, setQuestion] = useState(data.question || '');
@@ -15,18 +17,19 @@ export default function ConversationNode({ id, data }) {
 
   const updateNode = useStore(state => state.updateNode);
   const getCurrentNodes = useStore(state => state.getCurrentNodes);
-  const incrementAutoCount = useStore(state => state.incrementAutoCount);
-  const getAutoCount = useStore(state => state.getAutoCount);
-  const resetAutoCount = useStore(state => state.resetAutoCount);
   const autoNodeEnabled = useStore(state => state.autoNodeEnabled);
+  const setFlowPath = useStore(state => state.setFlowPath);
+  const clearFlowPath = useStore(state => state.clearFlowPath);
+  const flowPathNodes = useStore(state => state.flowPathNodes);
+  const { getAutoCount, incrementAutoCount, resetAutoCount } = useStore();
 
-  // 从节点数据中获取宽度，默认 280
+  const reactFlowInstance = useReactFlow();
+  const zoom = reactFlowInstance?.getZoom() || 1;
+
   const nodeWidth = data.width || 280;
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (isEditing && inputRef.current) inputRef.current.focus();
   }, [isEditing]);
 
   const handleFileUpload = (e) => {
@@ -39,18 +42,13 @@ export default function ConversationNode({ id, data }) {
     }
     const reader = new FileReader();
     reader.onload = (event) => {
-      setAttachedFile({
-        name: file.name,
-        content: event.target.result,
-      });
+      setAttachedFile({ name: file.name, content: event.target.result });
     };
     reader.readAsText(file, 'UTF-8');
     e.target.value = '';
   };
 
-  const removeAttachedFile = () => {
-    setAttachedFile(null);
-  };
+  const removeAttachedFile = () => setAttachedFile(null);
 
   const handleSend = async () => {
     if (!question.trim() && !attachedFile) return;
@@ -61,21 +59,28 @@ export default function ConversationNode({ id, data }) {
       const allNodes = getCurrentNodes();
       const node = allNodes.find(n => n.id === id);
       if (!node) return;
-
       if (!node.parentId) {
         alert('此节点没有父节点，请先连接到 Agent 根节点或其他对话节点。');
         setIsSending(false);
         return;
       }
 
-      const context = collectContext(allNodes, node.parentId);
+      // 祖先路径用于流光线
+      const ancestorIds = getAncestorPath(allNodes, id);
+      const ancestorEdgeIds = [];
+      for (let i = 0; i < ancestorIds.length - 1; i++) {
+        ancestorEdgeIds.push(`${ancestorIds[i]}-${ancestorIds[i+1]}`);
+      }
+      setFlowPath(ancestorIds, ancestorEdgeIds);
 
+      const context = collectContext(allNodes, node.parentId);
       let agentId = node.agentId;
       if (!agentId) {
         const nearest = findNearestAgentId(allNodes, id);
         if (!nearest) {
           alert('该节点未连接到任何 Agent，请先连接至 Agent 根节点');
           setIsSending(false);
+          clearFlowPath();
           return;
         }
         agentId = nearest;
@@ -84,8 +89,8 @@ export default function ConversationNode({ id, data }) {
 
       let apiQuestion = question;
       if (attachedFile) {
-        const fileInfo = `\n\n[上传文件：${attachedFile.name}]\n内容：\n${attachedFile.content}`;
-        apiQuestion = question ? fileInfo + question : `请分析以上文件内容：\n${attachedFile.content}`;
+        const fileInfo = `[上传文件：${attachedFile.name}]\n内容：\n${attachedFile.content}\n\n`;
+        apiQuestion = question ? fileInfo + question : `请分析以下文件内容：\n${attachedFile.content}`;
       }
 
       const { answer, autoAction } = await sendMessage(agentId, apiQuestion, context);
@@ -103,6 +108,7 @@ export default function ConversationNode({ id, data }) {
 
       setIsEditing(false);
       setAttachedFile(null);
+      clearFlowPath();
 
       if (autoNodeEnabled && autoAction) {
         const parentNode = allNodes.find(n => n.id === node.parentId) || node;
@@ -128,6 +134,7 @@ export default function ConversationNode({ id, data }) {
     } catch (error) {
       console.error('发送失败', error);
       alert('发送失败：' + error.message);
+      clearFlowPath();
     } finally {
       setIsSending(false);
     }
@@ -140,127 +147,133 @@ export default function ConversationNode({ id, data }) {
     }
   };
 
-  // 只读状态
-  if (data.answer) {
-    const attachedFiles = data.attachedFiles || [];
-    return (
-      <div
-        className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''}`}
-        style={{ width: nodeWidth, minWidth: 200 }}
-      >
-        <NodeResizer
-          minWidth={200}
-          maxWidth={5000}
-          onResize={(_, params) => {
-            updateNode(id, { width: params.width });
-          }}
-          lineStyle={{ borderColor: 'transparent' }}
-          handleStyle={{ opacity: 0 }}
-        />
-        <Handle type="target" position={Position.Top} id="target-top" style={{ background: '#9ca3af' }} />
-        <Handle type="target" position={Position.Right} id="target-right" style={{ background: '#9ca3af' }} />
-        <Handle type="target" position={Position.Bottom} id="target-bottom" style={{ background: '#9ca3af' }} />
-        <Handle type="target" position={Position.Left} id="target-left" style={{ background: '#9ca3af' }} />
+  const isFlowActive = flowPathNodes.includes(id);
 
-        <div className="p-2 border-b bg-gray-50 text-sm font-medium">问题</div>
-        <div className="p-2 text-sm whitespace-pre-wrap">{data.question}</div>
-
-        {attachedFiles.length > 0 && (
-          <div className="px-2 pb-1">
-            <div className="text-xs text-gray-500 mb-1">附件：</div>
+  const contentRenderer = useMemo(() => {
+    if (data.answer) {
+      if (zoom >= 0.7) {
+        return (
+          <>
+            <div className="p-2 border-b bg-gray-50 text-sm font-medium">问题</div>
+            <div className="p-2 text-sm whitespace-pre-wrap">{data.question}</div>
+            {data.attachedFiles?.length > 0 && (
+              <div className="px-2 pb-1">
+                <div className="text-xs text-gray-500 mb-1">附件：</div>
+                <div className="flex flex-wrap gap-1">
+                  {data.attachedFiles.map((name, i) => (
+                    <span key={i} className="inline-flex items-center bg-gray-100 rounded px-2 py-0.5 text-xs">
+                      <span className="mr-1">📄</span>{name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
+            <div className="p-2 text-sm prose max-w-none">
+              <ReactMarkdown>{data.answer}</ReactMarkdown>
+            </div>
+          </>
+        );
+      } else if (zoom >= 0.5) {
+        return (
+          <div className="p-2 flex flex-col gap-2">
             <div className="flex flex-wrap gap-1">
-              {attachedFiles.map((fileName, idx) => (
-                <span key={idx} className="inline-flex items-center bg-gray-100 rounded px-2 py-0.5 text-xs">
-                  <span className="mr-1">📄</span>
-                  <span className="truncate max-w-[150px]">{fileName}</span>
-                </span>
+              {Array.from({ length: 20 }).map((_, i) => (
+                <span key={i} className="w-2 h-3 bg-gray-300 rounded-sm" />
+              ))}
+            </div>
+            <hr className="border-gray-300" />
+            <div className="flex flex-wrap gap-1">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <span key={i} className="w-2 h-3 bg-gray-300 rounded-sm" />
               ))}
             </div>
           </div>
-        )}
+        );
+      } else if (zoom >= 0.2) {
+        return (
+          <div className="p-2 flex flex-col gap-3">
+            <div className="w-full h-2 bg-gray-300 rounded" />
+            <hr className="border-gray-300" />
+            <div className="w-3/4 h-2 bg-gray-300 rounded" />
+            <div className="w-full h-2 bg-gray-300 rounded" />
+          </div>
+        );
+      } else {
+        return (
+          <div className="p-2 flex flex-col gap-3">
+            <div className="w-full h-6 bg-gray-300 rounded" />
+            <div className="w-full h-6 bg-gray-300 rounded" />
+          </div>
+        );
+      }
+    } else {
+      return (
+        <>
+          <div className="p-2 bg-blue-50 text-sm font-medium flex justify-between items-center">
+            <span>新对话</span>
+            <button
+              className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+              onClick={() => fileInputRef.current.click()}
+            >
+              📎 上传
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              accept=".txt,.md,.json,.js,.jsx,.ts,.tsx,.py,.html,.htm,.css,.csv,.xml,.yaml,.yml,.log,.sh,.bat,.ini,.cfg,.conf,text/plain"
+              onChange={handleFileUpload}
+            />
+          </div>
+          {attachedFile && (
+            <div className="px-2 pt-1">
+              <div className="flex items-center justify-between bg-gray-100 rounded px-2 py-1 text-xs">
+                <span className="truncate flex items-center">
+                  <span className="mr-1">📄</span>
+                  {attachedFile.name}
+                </span>
+                <button className="ml-2 text-gray-500 hover:text-red-500" onClick={removeAttachedFile}>✕</button>
+              </div>
+            </div>
+          )}
+          <textarea
+            ref={inputRef}
+            className="w-full p-2 text-sm border-0 focus:ring-0 resize-none"
+            rows={3}
+            placeholder={attachedFile ? "输入问题（可选）..." : "输入您的问题..."}
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isSending}
+          />
+          <button
+            className="m-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-400"
+            onClick={handleSend}
+            disabled={isSending || (!question.trim() && !attachedFile)}
+          >
+            {isSending ? '发送中...' : '发送'}
+          </button>
+        </>
+      );
+    }
+  }, [data, zoom, question, attachedFile, isSending]);
 
-        <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
-        <div className="p-2 text-sm prose max-w-none">
-          <ReactMarkdown>{data.answer}</ReactMarkdown>
-        </div>
-
-        <Handle type="source" position={Position.Top} id="source-top" style={{ background: '#9ca3af' }} />
-        <Handle type="source" position={Position.Right} id="source-right" style={{ background: '#9ca3af' }} />
-        <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ background: '#9ca3af' }} />
-        <Handle type="source" position={Position.Left} id="source-left" style={{ background: '#9ca3af' }} />
-      </div>
-    );
-  }
-
-  // 编辑状态
   return (
-    <div className="conversation-node" style={{ width: nodeWidth, minWidth: 200 }}>
+    <div
+      className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''} ${isFlowActive ? 'flow-active' : ''}`}
+      style={{ width: nodeWidth, minWidth: 200 }}
+    >
       <NodeResizer
-        minWidth={200}
-        maxWidth={500}
-        onResize={(_, params) => {
-          updateNode(id, { width: params.width });
-        }}
-        lineStyle={{ borderColor: 'transparent' }}
-        handleStyle={{ opacity: 0 }}
+        minWidth={200} maxWidth={MAX_NODE_WIDTH}
+        onResize={(_, params) => updateNode(id, { width: params.width })}
+        lineStyle={{ borderColor: 'transparent' }} handleStyle={{ opacity: 0 }}
       />
       <Handle type="target" position={Position.Top} id="target-top" style={{ background: '#9ca3af' }} />
       <Handle type="target" position={Position.Right} id="target-right" style={{ background: '#9ca3af' }} />
       <Handle type="target" position={Position.Bottom} id="target-bottom" style={{ background: '#9ca3af' }} />
       <Handle type="target" position={Position.Left} id="target-left" style={{ background: '#9ca3af' }} />
-
-      <div className="p-2 bg-blue-50 text-sm font-medium flex justify-between items-center">
-        <span>新对话</span>
-        <button
-          className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
-          onClick={() => fileInputRef.current.click()}
-        >
-          📎 上传
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          accept=".txt,.md,.json,.js,.jsx,.ts,.tsx,.py,.html,.htm,.css,.csv,.xml,.yaml,.yml,.log,.sh,.bat,.ini,.cfg,.conf,text/plain"
-          onChange={handleFileUpload}
-        />
-      </div>
-
-      {attachedFile && (
-        <div className="px-2 pt-1">
-          <div className="flex items-center justify-between bg-gray-100 rounded px-2 py-1 text-xs">
-            <span className="truncate flex items-center">
-              <span className="mr-1">📄</span>
-              {attachedFile.name}
-            </span>
-            <button
-              className="ml-2 text-gray-500 hover:text-red-500"
-              onClick={removeAttachedFile}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      <textarea
-        ref={inputRef}
-        className="w-full p-2 text-sm border-0 focus:ring-0 resize-none"
-        rows={3}
-        placeholder={attachedFile ? "输入问题（可选）..." : "输入您的问题..."}
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={isSending}
-      />
-      <button
-        className="m-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-400"
-        onClick={handleSend}
-        disabled={isSending || (!question.trim() && !attachedFile)}
-      >
-        {isSending ? '发送中...' : '发送'}
-      </button>
-
+      {contentRenderer}
       <Handle type="source" position={Position.Top} id="source-top" style={{ background: '#9ca3af' }} />
       <Handle type="source" position={Position.Right} id="source-right" style={{ background: '#9ca3af' }} />
       <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ background: '#9ca3af' }} />

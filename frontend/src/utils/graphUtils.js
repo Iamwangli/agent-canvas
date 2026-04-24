@@ -13,7 +13,7 @@ export function collectContext(nodes, startNodeId) {
   return history;
 }
 
-// 检查是否会形成循环（newParent是否是child的后代）
+// 检查是否会形成循环
 export function wouldCreateCycle(nodes, childId, newParentId) {
   if (childId === newParentId) return true;
   let current = newParentId;
@@ -35,4 +35,15 @@ export function findNearestAgentId(nodes, nodeId) {
     currentId = node.parentId;
   }
   return null;
+}
+
+// 获取从节点到根节点的祖先ID数组（包含自身）
+export function getAncestorPath(nodes, nodeId) {
+  const path = [nodeId];
+  let current = nodes.find(n => n.id === nodeId);
+  while (current?.parentId) {
+    path.push(current.parentId);
+    current = nodes.find(n => n.id === current.parentId);
+  }
+  return path;
 }
