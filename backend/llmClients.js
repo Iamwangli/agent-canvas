@@ -62,6 +62,8 @@ export async function callLLM(agent, question, context) {
     model: agent.model,
     messages: messages,
     temperature: 0.7,
+    reasoning_effort: 'high',  // 或 'max'
+    extra_body: { thinking: { type: 'enabled' } }
   });
   return response.choices[0].message.content;
 }
