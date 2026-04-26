@@ -6,7 +6,7 @@ export const agents = {
     model: 'deepseek-chat',
     apiType: 'openai',   // 使用OpenAI兼容接口
     apiKey: process.env.DEEPSEEK_API_KEY || '',
-    baseURL: 'https://api.deepseek.com/v1',
+    baseURL: 'https://api.deepseek.com',
   }
   // 'qwen': {
   //   id: 'qwen',
