@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Handle, Position, NodeResizer, useReactFlow } from 'reactflow';
+import React, { useState, useEffect, useRef } from 'react';
+import { Handle, Position, NodeResizer } from 'reactflow';
 import ReactMarkdown from 'react-markdown';
 import useStore from '../store';
 import { sendMessage } from '../api';
@@ -22,9 +22,6 @@ export default function ConversationNode({ id, data }) {
   const clearFlowPath = useStore(state => state.clearFlowPath);
   const flowPathNodes = useStore(state => state.flowPathNodes);
   const { getAutoCount, incrementAutoCount, resetAutoCount } = useStore();
-
-  const reactFlowInstance = useReactFlow();
-  const zoom = reactFlowInstance?.getZoom() || 1;
 
   const nodeWidth = data.width || 280;
 
@@ -65,7 +62,7 @@ export default function ConversationNode({ id, data }) {
         return;
       }
 
-      // 祖先路径用于流光线
+      // 流光线路径
       const ancestorIds = getAncestorPath(allNodes, id);
       const ancestorEdgeIds = [];
       for (let i = 0; i < ancestorIds.length - 1; i++) {
@@ -100,11 +97,7 @@ export default function ConversationNode({ id, data }) {
         ? [...currentAttachedFiles, attachedFile.name]
         : currentAttachedFiles;
 
-      updateNode(id, {
-        question,
-        answer,
-        attachedFiles: newAttachedFiles,
-      });
+      updateNode(id, { question, answer, attachedFiles: newAttachedFiles });
 
       setIsEditing(false);
       setAttachedFile(null);
@@ -147,123 +140,56 @@ export default function ConversationNode({ id, data }) {
     }
   };
 
-  const isFlowActive = flowPathNodes.includes(id);
+  // 只读状态
+  if (data.answer) {
+    const attachedFiles = data.attachedFiles || [];
+    return (
+      <div
+        className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''} ${flowPathNodes.includes(id) ? 'flow-active' : ''}`}
+        style={{ width: nodeWidth, minWidth: 200 }}
+      >
+        <NodeResizer
+          minWidth={200} maxWidth={MAX_NODE_WIDTH}
+          onResize={(_, params) => updateNode(id, { width: params.width })}
+          lineStyle={{ borderColor: 'transparent' }} handleStyle={{ opacity: 0 }}
+        />
+        <Handle type="target" position={Position.Top} id="target-top" style={{ background: '#9ca3af' }} />
+        <Handle type="target" position={Position.Right} id="target-right" style={{ background: '#9ca3af' }} />
+        <Handle type="target" position={Position.Bottom} id="target-bottom" style={{ background: '#9ca3af' }} />
+        <Handle type="target" position={Position.Left} id="target-left" style={{ background: '#9ca3af' }} />
 
-  const contentRenderer = useMemo(() => {
-    if (data.answer) {
-      if (zoom >= 0.7) {
-        return (
-          <>
-            <div className="p-2 border-b bg-gray-50 text-sm font-medium">问题</div>
-            <div className="p-2 text-sm whitespace-pre-wrap">{data.question}</div>
-            {data.attachedFiles?.length > 0 && (
-              <div className="px-2 pb-1">
-                <div className="text-xs text-gray-500 mb-1">附件：</div>
-                <div className="flex flex-wrap gap-1">
-                  {data.attachedFiles.map((name, i) => (
-                    <span key={i} className="inline-flex items-center bg-gray-100 rounded px-2 py-0.5 text-xs">
-                      <span className="mr-1">📄</span>{name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
-            <div className="p-2 text-sm prose max-w-none">
-              <ReactMarkdown>{data.answer}</ReactMarkdown>
-            </div>
-          </>
-        );
-      } else if (zoom >= 0.5) {
-        return (
-          <div className="p-2 flex flex-col gap-2">
+        <div className="p-2 border-b bg-gray-50 text-sm font-medium">问题</div>
+        <div className="p-2 text-sm whitespace-pre-wrap">{data.question}</div>
+
+        {attachedFiles.length > 0 && (
+          <div className="px-2 pb-1">
+            <div className="text-xs text-gray-500 mb-1">附件：</div>
             <div className="flex flex-wrap gap-1">
-              {Array.from({ length: 20 }).map((_, i) => (
-                <span key={i} className="w-2 h-3 bg-gray-300 rounded-sm" />
-              ))}
-            </div>
-            <hr className="border-gray-300" />
-            <div className="flex flex-wrap gap-1">
-              {Array.from({ length: 15 }).map((_, i) => (
-                <span key={i} className="w-2 h-3 bg-gray-300 rounded-sm" />
-              ))}
-            </div>
-          </div>
-        );
-      } else if (zoom >= 0.2) {
-        return (
-          <div className="p-2 flex flex-col gap-3">
-            <div className="w-full h-2 bg-gray-300 rounded" />
-            <hr className="border-gray-300" />
-            <div className="w-3/4 h-2 bg-gray-300 rounded" />
-            <div className="w-full h-2 bg-gray-300 rounded" />
-          </div>
-        );
-      } else {
-        return (
-          <div className="p-2 flex flex-col gap-3">
-            <div className="w-full h-6 bg-gray-300 rounded" />
-            <div className="w-full h-6 bg-gray-300 rounded" />
-          </div>
-        );
-      }
-    } else {
-      return (
-        <>
-          <div className="p-2 bg-blue-50 text-sm font-medium flex justify-between items-center">
-            <span>新对话</span>
-            <button
-              className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
-              onClick={() => fileInputRef.current.click()}
-            >
-              📎 上传
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              accept=".txt,.md,.json,.js,.jsx,.ts,.tsx,.py,.html,.htm,.css,.csv,.xml,.yaml,.yml,.log,.sh,.bat,.ini,.cfg,.conf,text/plain"
-              onChange={handleFileUpload}
-            />
-          </div>
-          {attachedFile && (
-            <div className="px-2 pt-1">
-              <div className="flex items-center justify-between bg-gray-100 rounded px-2 py-1 text-xs">
-                <span className="truncate flex items-center">
-                  <span className="mr-1">📄</span>
-                  {attachedFile.name}
+              {attachedFiles.map((name, i) => (
+                <span key={i} className="inline-flex items-center bg-gray-100 rounded px-2 py-0.5 text-xs">
+                  <span className="mr-1">📄</span>{name}
                 </span>
-                <button className="ml-2 text-gray-500 hover:text-red-500" onClick={removeAttachedFile}>✕</button>
-              </div>
+              ))}
             </div>
-          )}
-          <textarea
-            ref={inputRef}
-            className="w-full p-2 text-sm border-0 focus:ring-0 resize-none"
-            rows={3}
-            placeholder={attachedFile ? "输入问题（可选）..." : "输入您的问题..."}
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isSending}
-          />
-          <button
-            className="m-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-400"
-            onClick={handleSend}
-            disabled={isSending || (!question.trim() && !attachedFile)}
-          >
-            {isSending ? '发送中...' : '发送'}
-          </button>
-        </>
-      );
-    }
-  }, [data, zoom, question, attachedFile, isSending]);
+          </div>
+        )}
 
+        <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
+        <div className="p-2 text-sm prose max-w-none">
+          <ReactMarkdown>{data.answer}</ReactMarkdown>
+        </div>
+
+        <Handle type="source" position={Position.Top} id="source-top" style={{ background: '#9ca3af' }} />
+        <Handle type="source" position={Position.Right} id="source-right" style={{ background: '#9ca3af' }} />
+        <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ background: '#9ca3af' }} />
+        <Handle type="source" position={Position.Left} id="source-left" style={{ background: '#9ca3af' }} />
+      </div>
+    );
+  }
+
+  // 编辑状态
   return (
-    <div
-      className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''} ${isFlowActive ? 'flow-active' : ''}`}
-      style={{ width: nodeWidth, minWidth: 200 }}
-    >
+    <div className="conversation-node" style={{ width: nodeWidth, minWidth: 200 }}>
       <NodeResizer
         minWidth={200} maxWidth={MAX_NODE_WIDTH}
         onResize={(_, params) => updateNode(id, { width: params.width })}
@@ -273,7 +199,53 @@ export default function ConversationNode({ id, data }) {
       <Handle type="target" position={Position.Right} id="target-right" style={{ background: '#9ca3af' }} />
       <Handle type="target" position={Position.Bottom} id="target-bottom" style={{ background: '#9ca3af' }} />
       <Handle type="target" position={Position.Left} id="target-left" style={{ background: '#9ca3af' }} />
-      {contentRenderer}
+
+      <div className="p-2 bg-blue-50 text-sm font-medium flex justify-between items-center">
+        <span>新对话</span>
+        <button
+          className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
+          onClick={() => fileInputRef.current.click()}
+        >
+          📎 上传
+        </button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          accept=".txt,.md,.json,.js,.jsx,.ts,.tsx,.py,.html,.htm,.css,.csv,.xml,.yaml,.yml,.log,.sh,.bat,.ini,.cfg,.conf,text/plain"
+          onChange={handleFileUpload}
+        />
+      </div>
+
+      {attachedFile && (
+        <div className="px-2 pt-1">
+          <div className="flex items-center justify-between bg-gray-100 rounded px-2 py-1 text-xs">
+            <span className="truncate flex items-center">
+              <span className="mr-1">📄</span>{attachedFile.name}
+            </span>
+            <button className="ml-2 text-gray-500 hover:text-red-500" onClick={removeAttachedFile}>✕</button>
+          </div>
+        </div>
+      )}
+
+      <textarea
+        ref={inputRef}
+        className="w-full p-2 text-sm border-0 focus:ring-0 resize-none"
+        rows={3}
+        placeholder={attachedFile ? "输入问题（可选）..." : "输入您的问题..."}
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={isSending}
+      />
+      <button
+        className="m-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-400"
+        onClick={handleSend}
+        disabled={isSending || (!question.trim() && !attachedFile)}
+      >
+        {isSending ? '发送中...' : '发送'}
+      </button>
+
       <Handle type="source" position={Position.Top} id="source-top" style={{ background: '#9ca3af' }} />
       <Handle type="source" position={Position.Right} id="source-right" style={{ background: '#9ca3af' }} />
       <Handle type="source" position={Position.Bottom} id="source-bottom" style={{ background: '#9ca3af' }} />
