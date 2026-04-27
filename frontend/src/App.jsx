@@ -63,7 +63,7 @@ export default function App() {
       init();
       setInitialized(true);
     }
-  }, [hasHydrated]); // 只依赖 hasHydrated，init 内部会检查文件长度
+  }, [hasHydrated]);
 
   // 同步节点
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function App() {
     setNodes(flowNodes);
   }, [currentNodes, setNodes]);
 
-  // 同步边：子 → 父 (source = child, target = parent)
+  // 同步边：子 → 父，从节点数据读取 Handle 信息
   useEffect(() => {
     setEdges(prevEdges => {
       const expectedEdgesMap = new Map();
@@ -85,12 +85,15 @@ export default function App() {
           const edgeKey = `${node.id}->${node.parentId}`;
           expectedEdgesMap.set(edgeKey, {
             id: `${node.id}-${node.parentId}`,
-            source: node.id,        // 子节点
-            target: node.parentId,  // 父节点
+            source: node.id,
+            target: node.parentId,
             type: 'smoothstep',
             animated: node.isAutoCreated || false,
             markerEnd: { type: MarkerType.ArrowClosed },
             data: { isFlowActive: false },
+            // 优先使用节点中保存的 Handle
+            sourceHandle: node.sourceHandle || null,
+            targetHandle: node.targetHandle || null,
           });
         }
       });
@@ -103,8 +106,9 @@ export default function App() {
         const isFlow = flowPathEdges.includes(expectedEdge.id);
         newEdges.push({
           ...expectedEdge,
-          sourceHandle: existing?.sourceHandle || null,
-          targetHandle: existing?.targetHandle || null,
+          // 如果节点中没有 Handle，尝试从已有边恢复（兜底）
+          sourceHandle: expectedEdge.sourceHandle || existing?.sourceHandle || null,
+          targetHandle: expectedEdge.targetHandle || existing?.targetHandle || null,
           className: isFlow ? 'flow-active' : '',
           data: { isFlowActive: isFlow },
         });
@@ -114,7 +118,7 @@ export default function App() {
     });
   }, [currentNodes, flowPathEdges, setEdges]);
 
-  // 初始加载 Agent 根节点
+  // Agent 根节点初始化
   useEffect(() => {
     if (!initialized || !hasHydrated) return;
     const hasAgentRoot = currentNodes.some(n => n.type === 'agent');
@@ -134,7 +138,7 @@ export default function App() {
     }
   }, [initialized, currentNodes, updateCurrentNodes, hasHydrated]);
 
-  // 自动创建监听（不变）
+  // 自动创建监听
   useEffect(() => {
     const handleAutoCreate = (event) => {
       const { parentId, agentName, question } = event.detail;
@@ -161,7 +165,6 @@ export default function App() {
     }
   }, [currentNodes, updateNode]);
 
-  // 连线：只允许从子节点拖向父节点
   const onConnect = useCallback((params) => {
     const { source, target, sourceHandle, targetHandle } = params;
     const sourceNode = currentNodes.find(n => n.id === source);
@@ -176,10 +179,14 @@ export default function App() {
       return;
     }
 
-    // 更新子节点的 parentId 为 target
-    updateNode(source, { parentId: target });
+    // 更新子节点，同时保存 Handle 信息
+    updateNode(source, {
+      parentId: target,
+      sourceHandle,
+      targetHandle,
+    });
 
-    // 添加边
+    // 添加边（保留 Handle）
     setEdges(eds => addEdge({
       id: `${source}-${target}`,
       source,
@@ -197,9 +204,13 @@ export default function App() {
   }, [currentNodes, updateNode, setEdges]);
 
   const onEdgeDoubleClick = useCallback((event, edge) => {
-    // 删除连线：清除子节点的 parentId
     const childId = edge.source;
-    updateNode(childId, { parentId: null });
+    // 清除节点的 Handle 和父节点
+    updateNode(childId, {
+      parentId: null,
+      sourceHandle: null,
+      targetHandle: null,
+    });
     setEdges(eds => eds.filter(e => e.id !== edge.id));
     alert('连线已删除，该节点现在为自由节点，可重新连接');
   }, [updateNode, setEdges]);
@@ -256,20 +267,22 @@ export default function App() {
       default: newPosition.y += offset;
     }
     const newNodeId = uuidv4();
+    const { source: sHandle, target: tHandle } = DIRECTION_HANDLE_MAP[direction] || DIRECTION_HANDLE_MAP.bottom;
     const newNode = {
       id: newNodeId, type: 'conversation', parentId,
       agentId: parentNode.type === 'agent' ? parentNode.id : parentNode.agentId,
-      question: '', answer: '', hidden: false, isAutoCreated: false, position: newPosition,
+      question: '', answer: '', hidden: false, isAutoCreated: false,
+      position: newPosition,
+      sourceHandle: sHandle,
+      targetHandle: tHandle,
     };
     addNode(newNode);
-    const { source, target } = DIRECTION_HANDLE_MAP[direction] || DIRECTION_HANDLE_MAP.bottom;
-    // 边方向：子 -> 父
     setEdges(eds => addEdge({
       id: `${newNodeId}-${parentId}`,
-      source: newNodeId,      // 子
-      target: parentId,       // 父
-      sourceHandle: source,   // 子节点的 source handle (面向父节点)
-      targetHandle: target,   // 父节点的 target handle (面向子节点)
+      source: newNodeId,
+      target: parentId,
+      sourceHandle: sHandle,
+      targetHandle: tHandle,
       type: 'smoothstep',
       animated: false,
       markerEnd: { type: MarkerType.ArrowClosed },
@@ -287,10 +300,12 @@ export default function App() {
     const newNode = {
       id: newId, type: 'conversation', parentId: node.id,
       agentId: node.type === 'agent' ? node.id : node.data.agentId,
-      question: '', answer: '', hidden: false, isAutoCreated: false, position: newPosition,
+      question: '', answer: '', hidden: false, isAutoCreated: false,
+      position: newPosition,
+      sourceHandle: 'source-top',
+      targetHandle: 'target-bottom',
     };
     addNode(newNode);
-    // 边方向：子 -> 父
     setEdges(eds => addEdge({
       id: `${newId}-${node.id}`,
       source: newId,
@@ -328,6 +343,10 @@ export default function App() {
         connectionLineType={ConnectionLineType.Bezier}
         minZoom={0.05}
         fitView
+        isValidConnection={(connection) => {
+          const sourceNode = currentNodes.find(n => n.id === connection.source);
+          return sourceNode?.type !== 'agent';
+        }}
       >
         <Background gap={20} size={1} />
         <Controls />
