@@ -3,7 +3,7 @@ export const agents = {
   'deepseek': {
     id: 'deepseek',
     name: 'DeepSeek',
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-pro',
     apiType: 'openai',   // 使用OpenAI兼容接口
     apiKey: process.env.DEEPSEEK_API_KEY || '',
     baseURL: 'https://api.deepseek.com',
