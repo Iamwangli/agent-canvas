@@ -36,9 +36,15 @@
   animation: flowPulse 1s infinite;
 }
 
+.react-flow__edge-path {
+  stroke: #374151;
+  stroke-width: 2.5;
+}
+
+/* 流光线动画覆盖（使用 !important 确保生效） */
 .react-flow__edge.flow-active .react-flow__edge-path {
   stroke: #facc15 !important;
-  stroke-width: 3px;
+  stroke-width: 3px !important;
   stroke-dasharray: 5,5;
   animation: dashdraw 0.5s linear infinite;
 }
