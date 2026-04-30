@@ -36,6 +36,34 @@
   animation: flowPulse 1s infinite;
 }
 
+/* Markdown 表格样式 */
+.conversation-node .prose table {
+  @apply w-full border-collapse border border-gray-300 text-sm;
+}
+.conversation-node .prose th {
+  @apply border border-gray-300 bg-gray-100 px-3 py-1 font-medium text-left;
+}
+.conversation-node .prose td {
+  @apply border border-gray-300 px-3 py-1;
+}
+
+/* 代码块样式（若之前没有） */
+.conversation-node .prose pre {
+  @apply bg-gray-100 rounded p-2 overflow-x-auto text-sm;
+}
+.conversation-node .prose code {
+  @apply bg-gray-100 px-1 py-0.5 rounded text-sm;
+}
+.conversation-node .prose pre code {
+  @apply bg-transparent p-0;
+}
+
+/* 列表缩进修复 */
+.conversation-node .prose ul,
+.conversation-node .prose ol {
+  @apply pl-5;
+}
+
 .react-flow__edge-path {
   stroke: #374151;
   stroke-width: 2.5;

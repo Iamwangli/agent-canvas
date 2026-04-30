@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeResizer } from 'reactflow';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import useStore from '../store';
 import { sendMessage } from '../api';
 import { collectContext, findNearestAgentId, getAncestorPath } from '../utils/graphUtils';
@@ -176,7 +177,9 @@ export default function ConversationNode({ id, data }) {
 
         <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
         <div className="p-2 text-sm prose max-w-none">
-          <ReactMarkdown>{data.answer}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {data.answer}
+          </ReactMarkdown>
         </div>
 
         <Handle type="source" position={Position.Top} id="source-top" style={{ background: '#9ca3af' }} />
