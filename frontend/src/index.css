@@ -16,7 +16,7 @@
 }
 
 .conversation-node {
-  @apply bg-white border border-gray-300 rounded-lg shadow-md overflow-hidden;
+  @apply bg-white border-2 border-gray-400 rounded-lg shadow-md overflow-hidden;
   width: 280px;
   min-height: 100px;
 }
