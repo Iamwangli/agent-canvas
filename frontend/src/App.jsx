@@ -248,6 +248,29 @@ export default function App() {
     closeMenu();
   }, [menu, currentNodes, addNode, reactFlowInstance]);
 
+  const handleCopyContent = useCallback(async () => {
+    if (!menu) return;
+    const node = currentNodes.find(n => n.id === menu.nodeId);
+    if (!node) return;
+  
+    const parts = [];
+    if (node.question) {
+      parts.push(`问题：\n${node.question}`);
+    }
+    if (node.answer) {
+      parts.push(`回复：\n${node.answer}`);
+    }
+    const text = parts.join('\n\n');
+  
+    try {
+      await navigator.clipboard.writeText(text);
+      closeMenu();
+    } catch (err) {
+      console.error('复制失败:', err);
+      alert('复制失败，请检查浏览器剪贴板权限');
+    }
+  }, [menu, currentNodes]);
+
   const handleCreateChild = useCallback((direction) => {
     if (!menu) return;
     const parentId = menu.nodeId;
@@ -361,6 +384,7 @@ export default function App() {
           onHide={handleHide} onShow={handleShow} onDelete={handleDelete}
           onCopy={handleCopyNode} onCreateChild={handleCreateChild}
           isHidden={currentNodes.find(n => n.id === menu.nodeId)?.hidden || false}
+          onCopyContent={handleCopyContent}
         />
       )}
     </div>

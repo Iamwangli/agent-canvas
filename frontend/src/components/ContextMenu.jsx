@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
-export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy, onCreateChild, isHidden }) {
+export default function ContextMenu({ 
+  x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy, onCreateChild, isHidden, onCopyContent 
+}) {
   const [showDirectionMenu, setShowDirectionMenu] = useState(false);
 
   useEffect(() => {
@@ -28,6 +30,12 @@ export default function ContextMenu({ x, y, nodeId, onClose, onHide, onDelete, o
       <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onCopy}>
         复制节点
       </button>
+
+      {onCopyContent && (
+        <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onCopyContent}>
+          复制内容
+        </button>
+      )}
 
       <div className="relative">
         <button
