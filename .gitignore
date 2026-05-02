@@ -61,3 +61,5 @@ docker-compose.override.yml
 
 # 其他
 agent-canvas-code.txt
+script_bundle.sh
+token_num.py
