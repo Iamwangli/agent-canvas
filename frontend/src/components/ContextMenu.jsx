@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 
 export default function ContextMenu({ 
   x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy, onCreateChild, 
-  isHidden, onCopyContent, onCollapseToggle, isCollapsed 
+  isHidden, onCopyContent, onCollapseToggle, isCollapsed,
+  onAlignToParent, hasParent
 }) {
   const [showDirectionMenu, setShowDirectionMenu] = useState(false);
 
@@ -35,6 +36,12 @@ export default function ContextMenu({
       {onCopyContent && (
         <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onCopyContent}>
           复制内容
+        </button>
+      )}
+
+      {hasParent && onAlignToParent && (
+        <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onAlignToParent}>
+          对齐到父节点
         </button>
       )}
 

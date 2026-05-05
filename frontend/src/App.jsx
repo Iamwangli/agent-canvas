@@ -278,6 +278,52 @@ export default function App() {
     closeMenu();
   }, [menu]);
 
+  const handleAlignToParent = useCallback(() => {
+    if (!menu || !reactFlowInstance) return;
+    const nodeId = menu.nodeId;
+    const childNodeData = currentNodes.find(n => n.id === nodeId);
+    if (!childNodeData || !childNodeData.parentId) return;
+  
+    const parentId = childNodeData.parentId;
+    const childRFNode = reactFlowInstance.getNode(nodeId);
+    const parentRFNode = reactFlowInstance.getNode(parentId);
+    if (!childRFNode || !parentRFNode) return;
+  
+    const childWidth = childRFNode.width ?? 280;
+    const parentWidth = parentRFNode.width ?? 120;
+    const childHeight = childRFNode.height ?? 100;
+    const parentHeight = parentRFNode.height ?? 60;
+  
+    // 获取 handle 信息（优先使用节点中保存的）
+    const sourceHandle = childNodeData.sourceHandle || 'source-top';
+    const targetHandle = childNodeData.targetHandle || 'target-bottom';
+  
+    const parentCenterX = parentRFNode.position.x + parentWidth / 2;
+    const parentCenterY = parentRFNode.position.y + parentHeight / 2;
+    const childCenterX = childRFNode.position.x + childWidth / 2;
+    const childCenterY = childRFNode.position.y + childHeight / 2;
+  
+    let newX = childNodeData.position.x;
+    let newY = childNodeData.position.y;
+  
+    // 根据连线方向调整对应轴（仅移动一个轴，不改变另一轴）
+    const isSourceTop = sourceHandle.includes('top');
+    const isSourceBottom = sourceHandle.includes('bottom');
+    const isSourceLeft = sourceHandle.includes('left');
+    const isSourceRight = sourceHandle.includes('right');
+  
+    if (isSourceTop || isSourceBottom) {
+      // 上下连线 → 只调整水平位置（使子节点水平居中于父节点）
+      newX = parentCenterX - childWidth / 2;
+    } else if (isSourceLeft || isSourceRight) {
+      // 左右连线 → 只调整垂直位置（使子节点垂直居中于父节点）
+      newY = parentCenterY - childHeight / 2;
+    }
+    // 其他方向（如斜向）不做调整
+  
+    updateNode(nodeId, { position: { x: newX, y: newY } });
+    closeMenu();
+  }, [menu, currentNodes, reactFlowInstance, updateNode]);
 
   const handleCreateChild = useCallback((direction) => {
     if (!menu) return;
@@ -401,6 +447,8 @@ export default function App() {
           onCopyContent={handleCopyContent}
           onCollapseToggle={handleCollapseToggle}
           isCollapsed={currentNodes.find(n => n.id === menu.nodeId)?.collapsed || false}
+          onAlignToParent={handleAlignToParent}
+          hasParent={!!currentNodes.find(n => n.id === menu.nodeId)?.parentId}
         />
       )}
     </div>
