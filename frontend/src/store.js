@@ -112,6 +112,14 @@ const useStore = create(
         get().updateCurrentNodes(newNodes);
       },
 
+      toggleCollapseNode: (id) => {
+        const nodes = get().getCurrentNodes();
+        const newNodes = nodes.map(n => 
+          n.id === id ? { ...n, collapsed: !n.collapsed } : n
+        );
+        get().updateCurrentNodes(newNodes);
+      },
+
       setNodes: (nodes) => get().updateCurrentNodes(nodes),
 
       toggleAutoNode: () => set((state) => ({ autoNodeEnabled: !state.autoNodeEnabled })),

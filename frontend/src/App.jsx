@@ -271,6 +271,14 @@ export default function App() {
     }
   }, [menu, currentNodes]);
 
+  const handleCollapseToggle = useCallback(() => {
+    if (!menu) return;
+    const { toggleCollapseNode } = useStore.getState();
+    toggleCollapseNode(menu.nodeId);
+    closeMenu();
+  }, [menu]);
+
+
   const handleCreateChild = useCallback((direction) => {
     if (!menu) return;
     const parentId = menu.nodeId;
@@ -380,11 +388,19 @@ export default function App() {
       </ReactFlow>
       {menu && (
         <ContextMenu
-          x={menu.x} y={menu.y} nodeId={menu.nodeId} onClose={closeMenu}
-          onHide={handleHide} onShow={handleShow} onDelete={handleDelete}
-          onCopy={handleCopyNode} onCreateChild={handleCreateChild}
+          x={menu.x} 
+          y={menu.y} 
+          nodeId={menu.nodeId} 
+          onClose={closeMenu}
+          onHide={handleHide} 
+          onShow={handleShow} 
+          onDelete={handleDelete}
+          onCopy={handleCopyNode} 
+          onCreateChild={handleCreateChild}
           isHidden={currentNodes.find(n => n.id === menu.nodeId)?.hidden || false}
           onCopyContent={handleCopyContent}
+          onCollapseToggle={handleCollapseToggle}
+          isCollapsed={currentNodes.find(n => n.id === menu.nodeId)?.collapsed || false}
         />
       )}
     </div>

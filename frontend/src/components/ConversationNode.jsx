@@ -144,6 +144,13 @@ export default function ConversationNode({ id, data }) {
   // 只读状态
   if (data.answer) {
     const attachedFiles = data.attachedFiles || [];
+    const isCollapsed = data.collapsed || false;
+
+    const handleToggleCollapse = () => {
+      const { toggleCollapseNode } = useStore.getState();
+      toggleCollapseNode(id);
+    };
+
     return (
       <div
         className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''} ${flowPathNodes.includes(id) ? 'flow-active' : ''}`}
@@ -160,7 +167,10 @@ export default function ConversationNode({ id, data }) {
         <Handle type="target" position={Position.Left} id="target-left" style={{ background: '#9ca3af' }} />
 
         <div className="p-2 border-b bg-gray-50 text-sm font-medium">问题</div>
-        <div className="p-2 text-sm whitespace-pre-wrap">{data.question}</div>
+        <div className={`p-2 text-sm whitespace-pre-wrap ${isCollapsed ? 'collapsed-question' : ''}`}>
+          {data.question}
+        </div>
+
 
         {attachedFiles.length > 0 && (
           <div className="px-2 pb-1">
@@ -176,11 +186,20 @@ export default function ConversationNode({ id, data }) {
         )}
 
         <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
-        <div className="p-2 text-sm prose max-w-none">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {data.answer}
-          </ReactMarkdown>
+        <div className={`p-2 text-sm prose max-w-none ${isCollapsed ? 'collapsed-answer' : ''}`}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.answer}</ReactMarkdown>
         </div>
+
+        {isCollapsed && (
+          <div className="px-2 pb-2 text-center">
+            <button
+              onClick={handleToggleCollapse}
+              className="text-xs text-blue-500 hover:underline"
+            >
+              显示全部
+            </button>
+          </div>
+        )}
 
         <Handle type="source" position={Position.Top} id="source-top" style={{ background: '#9ca3af' }} />
         <Handle type="source" position={Position.Right} id="source-right" style={{ background: '#9ca3af' }} />

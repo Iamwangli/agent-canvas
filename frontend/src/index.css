@@ -15,6 +15,23 @@
   height: 60px;
 }
 
+/* 折叠节点：问题和回复限制为三行 */
+.collapsed-question {
+  max-height: 4.5rem; /* 三行左右 */
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+
+.collapsed-answer {
+  max-height: 4.5rem;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+
 .conversation-node {
   @apply bg-white border-2 border-gray-400 rounded-lg shadow-md overflow-hidden;
   width: 280px;

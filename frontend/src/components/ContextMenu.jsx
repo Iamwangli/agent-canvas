@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
 export default function ContextMenu({ 
-  x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy, onCreateChild, isHidden, onCopyContent 
+  x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy, onCreateChild, 
+  isHidden, onCopyContent, onCollapseToggle, isCollapsed 
 }) {
   const [showDirectionMenu, setShowDirectionMenu] = useState(false);
 
@@ -65,6 +66,13 @@ export default function ContextMenu({
           </div>
         )}
       </div>
+
+      {/* 折叠/展开按钮 */}
+      {onCollapseToggle && (
+        <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onCollapseToggle}>
+          {isCollapsed ? '展开节点' : '折叠节点'}
+        </button>
+      )}
 
       {isHidden ? (
         <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onShow}>
