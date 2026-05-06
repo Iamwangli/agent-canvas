@@ -6,7 +6,11 @@ export function collectContext(nodes, startNodeId) {
     const node = nodes.find(n => n.id === currentId);
     if (!node) break;
     if (!node.hidden && node.answer && node.question) {
-      history.unshift({ question: node.question, answer: node.answer });
+      history.unshift({ 
+        question: node.question, 
+        answer: node.answer,
+        summary: node.summary || null,
+      });
     }
     currentId = node.parentId;
   }

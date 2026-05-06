@@ -17,14 +17,14 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.post('/api/chat', async (req, res) => {
-  const { agentId, question, context } = req.body;
+  const { agentId, question, context, skipAutoAction} = req.body;
   try {
     const agent = getAgentConfig(agentId);
     if (!agent) {
       return res.status(404).json({ error: 'Agent not found' });
     }
     const answer = await callLLM(agent, question, context);
-    const autoAction = detectAutoAction(answer, agent.name);
+    const autoAction = skipAutoAction ? null : detectAutoAction(answer, agent.name);
     res.json({ answer, autoAction });
   } catch (error) {
     console.error(error);

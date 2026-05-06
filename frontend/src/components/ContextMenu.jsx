@@ -3,7 +3,8 @@ import React, { useEffect, useState } from 'react';
 export default function ContextMenu({ 
   x, y, nodeId, onClose, onHide, onDelete, onShow, onCopy, onCreateChild, 
   isHidden, onCopyContent, onCollapseToggle, isCollapsed,
-  onAlignToParent, hasParent
+  onAlignToParent, hasParent,
+  onViewSummary, hasSummary
 }) {
   const [showDirectionMenu, setShowDirectionMenu] = useState(false);
 
@@ -36,6 +37,13 @@ export default function ContextMenu({
       {onCopyContent && (
         <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onCopyContent}>
           复制内容
+        </button>
+      )}
+
+      {/* 查看摘要 - 仅当节点有摘要时显示 */}
+      {hasSummary && onViewSummary && (
+        <button className="block w-full text-left px-4 py-1 hover:bg-gray-100" onClick={onViewSummary}>
+          查看摘要
         </button>
       )}
 

@@ -2,8 +2,8 @@ import axios from 'axios';
 
 const api = axios.create({ baseURL: '/api' });
 
-export async function sendMessage(agentId, question, context) {
-  const response = await api.post('/chat', { agentId, question, context });
+export async function sendMessage(agentId, question, context, skipAutoAction = false) {
+  const response = await api.post('/chat', { agentId, question, context, skipAutoAction });
   return response.data;
 }
 

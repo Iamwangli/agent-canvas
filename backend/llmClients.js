@@ -48,6 +48,9 @@ import OpenAI from 'openai';
 export async function callLLM(agent, question, context) {
   const messages = [];
   for (const item of context) {
+    if (item.summary) {
+      messages.push({ role: 'system', content: `[对话摘要]：${item.summary}` });
+    }
     messages.push({ role: 'user', content: item.question });
     messages.push({ role: 'assistant', content: item.answer });
   }

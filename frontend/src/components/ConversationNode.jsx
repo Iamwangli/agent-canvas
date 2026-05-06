@@ -91,6 +91,22 @@ export default function ConversationNode({ id, data }) {
         apiQuestion = question ? fileInfo + question : `请分析以下文件内容：\n${attachedFile.content}`;
       }
 
+      const generateSummary = async (nodeId, question, answer, agentId, allNodes, parentId) => {
+        try {
+          const summaryPrompt = `请用一两句话总结以下对话内容。只输出总结，不要包含任何其他内容。\n用户问题：${question}\n助手回复：${answer}`;
+          const { answer: summaryAnswer } = await sendMessage(
+            agentId,
+            summaryPrompt,
+            [], // 摘要生成不需要额外上下文
+            true  // skipAutoAction = true
+          );
+          updateNode(nodeId, { summary: summaryAnswer });
+        } catch (err) {
+          console.error('摘要生成失败', err);
+          // 静默失败，不打扰用户
+        }
+      };
+
       const { answer, autoAction } = await sendMessage(agentId, apiQuestion, context);
 
       const currentAttachedFiles = node.attachedFiles || [];
@@ -99,6 +115,8 @@ export default function ConversationNode({ id, data }) {
         : currentAttachedFiles;
 
       updateNode(id, { question, answer, attachedFiles: newAttachedFiles });
+
+      generateSummary(id, question, answer, agentId, allNodes, node.parentId);
 
       setIsEditing(false);
       setAttachedFile(null);

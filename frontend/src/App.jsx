@@ -271,6 +271,17 @@ export default function App() {
     }
   }, [menu, currentNodes]);
 
+  const handleViewSummary = useCallback(() => {
+    if (!menu) return;
+    const node = currentNodes.find(n => n.id === menu.nodeId);
+    if (!node || !node.summary) {
+      alert('该节点暂无摘要');
+      return;
+    }
+    alert(`摘要：\n${node.summary}`);
+    closeMenu();
+  }, [menu, currentNodes]);
+
   const handleCollapseToggle = useCallback(() => {
     if (!menu) return;
     const { toggleCollapseNode } = useStore.getState();
@@ -449,6 +460,8 @@ export default function App() {
           isCollapsed={currentNodes.find(n => n.id === menu.nodeId)?.collapsed || false}
           onAlignToParent={handleAlignToParent}
           hasParent={!!currentNodes.find(n => n.id === menu.nodeId)?.parentId}
+          onViewSummary={handleViewSummary}
+          hasSummary={!!(currentNodes.find(n => n.id === menu.nodeId)?.summary)}
         />
       )}
     </div>
