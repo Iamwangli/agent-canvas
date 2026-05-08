@@ -237,12 +237,27 @@ export default function App() {
     if (!menu || !reactFlowInstance) return;
     const nodeId = menu.nodeId;
     const originalNode = currentNodes.find(n => n.id === nodeId);
-    if (!originalNode || originalNode.type === 'agent') { alert('不能复制 Agent 根节点'); return; }
-    const position = reactFlowInstance.screenToFlowPosition({ x: menu.x, y: menu.y });
+    if (!originalNode || originalNode.type === 'agent') {
+      alert('不能复制 Agent 根节点');
+      return;
+    }
+    const position = reactFlowInstance.screenToFlowPosition({
+      x: menu.x,
+      y: menu.y,
+    });
     const newNode = {
-      id: uuidv4(), type: 'conversation', parentId: null, agentId: originalNode.agentId,
-      question: originalNode.question, answer: originalNode.answer,
-      hidden: originalNode.hidden, isAutoCreated: false, position,
+      id: uuidv4(),
+      type: 'conversation',
+      parentId: null,
+      agentId: originalNode.agentId,
+      question: originalNode.question,
+      answer: originalNode.answer,
+      hidden: originalNode.hidden,
+      isAutoCreated: false,
+      position,
+      summary: originalNode.summary,
+      attachedFiles: originalNode.attachedFiles || [],
+      width: originalNode.width || 280,
     };
     addNode(newNode);
     closeMenu();
