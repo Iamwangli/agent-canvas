@@ -33,13 +33,13 @@
 }
 
 .conversation-node {
-  @apply bg-white border-2 border-gray-400 rounded-lg shadow-md overflow-hidden;
+  @apply bg-white border-2 border-black rounded-lg shadow-md overflow-hidden;
   width: 280px;
   min-height: 100px;
 }
 
 .conversation-node.node-hidden {
-  @apply border-2 border-dashed border-gray-500 bg-gray-100 opacity-80;
+  @apply border-2 border-dashed border-black bg-gray-100 opacity-80;
 }
 
 .conversation-node.auto-created {
