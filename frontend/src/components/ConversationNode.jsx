@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeResizer } from 'reactflow';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import useStore from '../store';
 import { sendMessage } from '../api';
 import { collectContext, findNearestAgentId, getAncestorPath } from '../utils/graphUtils';
@@ -205,7 +206,12 @@ export default function ConversationNode({ id, data }) {
 
         <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
         <div className={`p-2 text-sm prose max-w-none ${isCollapsed ? 'collapsed-answer' : ''}`}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.answer}</ReactMarkdown>
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+          >
+            {data.answer}
+          </ReactMarkdown>
         </div>
 
         {isCollapsed && (

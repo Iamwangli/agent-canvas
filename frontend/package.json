@@ -13,6 +13,7 @@
     "react-dom": "^18.2.0",
     "react-markdown": "^9.0.1",
     "reactflow": "^11.10.4",
+    "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "uuid": "^9.0.1",
     "zustand": "^4.4.7"
@@ -20,11 +21,11 @@
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.4.16",
     "favicons": "^7.2.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
-    "vite": "^5.0.8"
+    "vite": "^8.0.12"
   }
 }
