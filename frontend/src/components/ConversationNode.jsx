@@ -7,7 +7,7 @@ import useStore from '../store';
 import { sendMessage } from '../api';
 import { collectContext, findNearestAgentId, getAncestorPath } from '../utils/graphUtils';
 
-const MAX_NODE_WIDTH = 1000;
+const MAX_NODE_WIDTH = 1200;
 
 export default function ConversationNode({ id, data }) {
   const [question, setQuestion] = useState(data.question || '');
@@ -25,7 +25,7 @@ export default function ConversationNode({ id, data }) {
   const flowPathNodes = useStore(state => state.flowPathNodes);
   const { getAutoCount, incrementAutoCount, resetAutoCount } = useStore();
 
-  const nodeWidth = data.width || 280;
+  const nodeWidth = data.width || 800;
 
   useEffect(() => {
     if (isEditing && inputRef.current) inputRef.current.focus();
