@@ -108,3 +108,28 @@
   50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
   100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
 }
+
+/* 代码块容器与复制按钮 */
+.code-block-wrapper {
+  position: relative;
+}
+.code-copy-button {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  background: rgba(75, 85, 99, 0.8);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.code-block-wrapper:hover .code-copy-button {
+  opacity: 1;
+}
+.code-copy-button:hover {
+  background: rgba(55, 65, 81, 0.9);
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Handle, Position, NodeResizer } from 'reactflow';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -8,6 +8,32 @@ import { sendMessage } from '../api';
 import { collectContext, findNearestAgentId, getAncestorPath } from '../utils/graphUtils';
 
 const MAX_NODE_WIDTH = 1200;
+
+const PreWithCopy = ({ children, ...props }) => {
+  const preRef = useRef(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback((e) => {
+    e.stopPropagation();          // 阻止事件冒泡到画布
+    const codeText = preRef.current?.innerText || '';
+    navigator.clipboard.writeText(codeText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(console.error);
+  }, []);
+
+  return (
+    <div className="code-block-wrapper">
+      <pre ref={preRef} {...props}>{children}</pre>
+      <button
+        onClick={handleCopy}
+        className="code-copy-button"
+      >
+        {copied ? '已复制' : '复制'}
+      </button>
+    </div>
+  );
+};
 
 export default function ConversationNode({ id, data }) {
   const [question, setQuestion] = useState(data.question || '');
@@ -209,6 +235,9 @@ export default function ConversationNode({ id, data }) {
           <ReactMarkdown 
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
+            components={{
+              pre: PreWithCopy,
+            }}
           >
             {data.answer}
           </ReactMarkdown>
