@@ -2,12 +2,31 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Handle, Position, NodeResizer } from 'reactflow';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import useStore from '../store';
 import { sendMessage } from '../api';
 import { collectContext, findNearestAgentId, getAncestorPath } from '../utils/graphUtils';
 
 const MAX_NODE_WIDTH = 1200;
+
+/**
+ * 预处理 AI 回复中的 LaTeX 公式分隔符。
+ * CommonMark 解析器会将 \( 和 \[ 中的反斜杠视为转义字符，
+ * 导致 remark-math 无法识别 LaTeX 公式分隔符。
+ * 这里提前转换：\(...\) → $...$（内联），\[...\] → $$...$$（块级）
+ * 注意：必须先处理块级再处理内联，避免误匹配嵌套结构。
+ */
+const preprocessLatex = (text) => {
+  if (!text) return text;
+  return text
+    // 块级公式：\[...\] → $$...$$
+    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+    // 内联公式：\(...\) → $...$
+    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+};
 
 const PreWithCopy = ({ children, ...props }) => {
   const preRef = useRef(null);
@@ -233,13 +252,13 @@ export default function ConversationNode({ id, data }) {
         <div className="p-2 border-t bg-gray-50 text-sm font-medium">回复</div>
         <div className={`p-2 text-sm prose max-w-none ${isCollapsed ? 'collapsed-answer' : ''}`}>
           <ReactMarkdown 
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeRaw, rehypeKatex]}
             components={{
               pre: PreWithCopy,
             }}
           >
-            {data.answer}
+            {preprocessLatex(data.answer)}
           </ReactMarkdown>
         </div>
 
