@@ -315,38 +315,34 @@ export default function App() {
     const parentRFNode = reactFlowInstance.getNode(parentId);
     if (!childRFNode || !parentRFNode) return;
   
-    const childWidth = childRFNode.width ?? 280;
+    // 获取实际渲染的尺寸，若获取不到则回退
+    // ConversationNode JSX 默认宽度为 800，与 data.width || 800 保持一致
+    const childWidth = childRFNode.width ?? (childNodeData.width || 800);
     const parentWidth = parentRFNode.width ?? 120;
     const childHeight = childRFNode.height ?? 100;
     const parentHeight = parentRFNode.height ?? 60;
   
-    // 获取 handle 信息（优先使用节点中保存的）
     const sourceHandle = childNodeData.sourceHandle || 'source-top';
     const targetHandle = childNodeData.targetHandle || 'target-bottom';
   
     const parentCenterX = parentRFNode.position.x + parentWidth / 2;
     const parentCenterY = parentRFNode.position.y + parentHeight / 2;
-    const childCenterX = childRFNode.position.x + childWidth / 2;
-    const childCenterY = childRFNode.position.y + childHeight / 2;
   
     let newX = childNodeData.position.x;
     let newY = childNodeData.position.y;
   
-    // 根据连线方向调整对应轴（仅移动一个轴，不改变另一轴）
     const isSourceTop = sourceHandle.includes('top');
     const isSourceBottom = sourceHandle.includes('bottom');
     const isSourceLeft = sourceHandle.includes('left');
     const isSourceRight = sourceHandle.includes('right');
   
     if (isSourceTop || isSourceBottom) {
-      // 上下连线 → 只调整水平位置（使子节点水平居中于父节点）
       newX = parentCenterX - childWidth / 2;
     } else if (isSourceLeft || isSourceRight) {
-      // 左右连线 → 只调整垂直位置（使子节点垂直居中于父节点）
       newY = parentCenterY - childHeight / 2;
     }
-    // 其他方向（如斜向）不做调整
   
+    // 不取整以保持精确居中，避免 smoothstep 连线产生可见折线
     updateNode(nodeId, { position: { x: newX, y: newY } });
     closeMenu();
   }, [menu, currentNodes, reactFlowInstance, updateNode]);

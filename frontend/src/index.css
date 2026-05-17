@@ -47,6 +47,12 @@
   animation: pulse 0.8s ease-in-out 3;
 }
 
+.conversation-node p,
+.conversation-node li,
+.conversation-node div {
+  line-height: 1.8;
+}
+
 
 .conversation-node.flow-active {
   border-color: #facc15 !important;
