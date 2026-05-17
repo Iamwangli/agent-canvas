@@ -78,3 +78,5 @@ DEEPSEEK_API_KEY=[Your API Key]
 ## 许可说明
 
 本仓库代码采用 个人非商业使用许可证。允许个人学习、研究、非商业项目免费使用。商业使用必须购买授权，请联系 [iamwanglihaha@gmail.com]。
+
+💖 [Sponsor](https://iamwangli.github.io/agent-canvas/donate/)
