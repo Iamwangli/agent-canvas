@@ -46,6 +46,7 @@ for root in backend frontend; do
         [ $skip -eq 1 ] && continue
 
         # 输出文件路径和内容
+        echo "$file"
         echo "---------------------- $file ------------------" >> "$OUTPUT_FILE"
         cat "$file" >> "$OUTPUT_FILE"
         echo "" >> "$OUTPUT_FILE"

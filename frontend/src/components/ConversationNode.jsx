@@ -12,28 +12,12 @@ import { collectContext, findNearestAgentId, getAncestorPath } from '../utils/gr
 
 const MAX_NODE_WIDTH = 1200;
 
-/**
- * 预处理 AI 回复中的 LaTeX 公式分隔符。
- * CommonMark 解析器会将 \( 和 \[ 中的反斜杠视为转义字符，
- * 导致 remark-math 无法识别 LaTeX 公式分隔符。
- * 这里提前转换：\(...\) → $...$（内联），\[...\] → $$...$$（块级）
- * 注意：必须先处理块级再处理内联，避免误匹配嵌套结构。
- */
-const preprocessLatex = (text) => {
-  if (!text) return text;
-  return text
-    // 块级公式：\[...\] → $$...$$
-    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
-    // 内联公式：\(...\) → $...$
-    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
-};
-
 const PreWithCopy = ({ children, ...props }) => {
   const preRef = useRef(null);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback((e) => {
-    e.stopPropagation();          // 阻止事件冒泡到画布
+    e.stopPropagation();
     const codeText = preRef.current?.innerText || '';
     navigator.clipboard.writeText(codeText).then(() => {
       setCopied(true);
@@ -44,21 +28,25 @@ const PreWithCopy = ({ children, ...props }) => {
   return (
     <div className="code-block-wrapper">
       <pre ref={preRef} {...props}>{children}</pre>
-      <button
-        onClick={handleCopy}
-        className="code-copy-button"
-      >
+      <button onClick={handleCopy} className="code-copy-button">
         {copied ? '已复制' : '复制'}
       </button>
     </div>
   );
 };
 
+const preprocessLatex = (text) => {
+  if (!text) return text;
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+};
+
 export default function ConversationNode({ id, data }) {
   const [question, setQuestion] = useState(data.question || '');
   const [isEditing, setIsEditing] = useState(!data.answer);
   const [isSending, setIsSending] = useState(false);
-  const [attachedFile, setAttachedFile] = useState(null);
+  const [attachedFiles, setAttachedFiles] = useState([]); // 改为数组
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -76,26 +64,42 @@ export default function ConversationNode({ id, data }) {
     if (isEditing && inputRef.current) inputRef.current.focus();
   }, [isEditing]);
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // 处理多文件上传
+  const handleFilesUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
     const allowedExtensions = ['.txt', '.md', '.json', '.js', '.jsx', '.ts', '.tsx', '.py', '.html', '.htm', '.css', '.csv', '.xml', '.yaml', '.yml', '.log', '.sh', '.bat', '.ini', '.cfg', '.conf'];
-    if (!allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
-      alert('仅支持文本文件（如 .txt, .md, .json, .js, .py, .html, .css 等）');
+    const invalidFiles = files.filter(f => !allowedExtensions.some(ext => f.name.toLowerCase().endsWith(ext)));
+    if (invalidFiles.length > 0) {
+      alert('以下文件不是支持的文本格式：\n' + invalidFiles.map(f => f.name).join('\n'));
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setAttachedFile({ name: file.name, content: event.target.result });
-    };
-    reader.readAsText(file, 'UTF-8');
-    e.target.value = '';
+
+    // 读取每个文件
+    const newFiles = [];
+    let readCount = 0;
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        newFiles.push({ name: file.name, content: event.target.result });
+        readCount++;
+        if (readCount === files.length) {
+          // 全部读取完成后更新状态（追加到已有文件）
+          setAttachedFiles(prev => [...prev, ...newFiles]);
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+    });
+    e.target.value = ''; // 允许再次选择相同文件
   };
 
-  const removeAttachedFile = () => setAttachedFile(null);
+  const removeAttachedFile = (index) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSend = async () => {
-    if (!question.trim() && !attachedFile) return;
+    if (!question.trim() && attachedFiles.length === 0) return;
     if (isSending) return;
 
     setIsSending(true);
@@ -109,7 +113,6 @@ export default function ConversationNode({ id, data }) {
         return;
       }
 
-      // 流光线路径
       const ancestorIds = getAncestorPath(allNodes, id);
       const ancestorEdgeIds = [];
       for (let i = 0; i < ancestorIds.length - 1; i++) {
@@ -131,41 +134,37 @@ export default function ConversationNode({ id, data }) {
         updateNode(id, { agentId });
       }
 
+      // 将当前附件内容拼接（发送时保持文件在前）
       let apiQuestion = question;
-      if (attachedFile) {
-        const fileInfo = `[上传文件：${attachedFile.name}]\n内容：\n${attachedFile.content}\n\n`;
-        apiQuestion = question ? fileInfo + question : `请分析以下文件内容：\n${attachedFile.content}`;
+      if (attachedFiles.length > 0) {
+        const fileContents = attachedFiles.map(f => `[${f.name}]\n${f.content}`).join('\n\n');
+        apiQuestion = question ? fileContents + '\n\n' + question : `请分析以下文件内容：\n${fileContents}`;
       }
-
-      const generateSummary = async (nodeId, question, answer, agentId, allNodes, parentId) => {
-        try {
-          const summaryPrompt = `请用一两句话总结以下对话内容。只输出总结，不要包含任何其他内容。\n用户问题：${question}\n助手回复：${answer}`;
-          const { answer: summaryAnswer } = await sendMessage(
-            agentId,
-            summaryPrompt,
-            [], // 摘要生成不需要额外上下文
-            true  // skipAutoAction = true
-          );
-          updateNode(nodeId, { summary: summaryAnswer });
-        } catch (err) {
-          console.error('摘要生成失败', err);
-          // 静默失败，不打扰用户
-        }
-      };
 
       const { answer, autoAction } = await sendMessage(agentId, apiQuestion, context);
 
-      const currentAttachedFiles = node.attachedFiles || [];
-      const newAttachedFiles = attachedFile
-        ? [...currentAttachedFiles, attachedFile.name]
-        : currentAttachedFiles;
+      // 将已有的附件（可能是之前留下的）与新附件合并
+      const existingAttachedFiles = node.attachedFiles || [];
+      // 兼容旧数据：如果元素是字符串，视为只有名称没有内容，我们保留它但不包含内容
+      const normalizedExisting = existingAttachedFiles.map(item => {
+        if (typeof item === 'string') return { name: item, content: '' };
+        return item;
+      });
+      // 合并去重（根据名称）
+      const merged = [...normalizedExisting];
+      attachedFiles.forEach(newFile => {
+        if (!merged.some(f => f.name === newFile.name)) {
+          merged.push(newFile);
+        }
+      });
 
-      updateNode(id, { question, answer, attachedFiles: newAttachedFiles });
+      updateNode(id, { question, answer, attachedFiles: merged });
 
-      generateSummary(id, question, answer, agentId, allNodes, node.parentId);
+      // 摘要生成保持不变
+      generateSummary(id, question, answer, agentId);
 
       setIsEditing(false);
-      setAttachedFile(null);
+      setAttachedFiles([]); // 清空当前待发送列表
       clearFlowPath();
 
       if (autoNodeEnabled && autoAction) {
@@ -180,7 +179,6 @@ export default function ConversationNode({ id, data }) {
           resetAutoCount(parentNode.id);
         }
         incrementAutoCount(parentNode.id);
-
         window.dispatchEvent(new CustomEvent('auto-create-node', {
           detail: {
             parentId: parentNode.id,
@@ -195,6 +193,16 @@ export default function ConversationNode({ id, data }) {
       clearFlowPath();
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const generateSummary = async (nodeId, question, answer, agentId) => {
+    try {
+      const summaryPrompt = `请用一两句话总结以下对话内容。只输出总结，不要包含任何其他内容。\n用户问题：${question}\n助手回复：${answer}`;
+      const { answer: summaryAnswer } = await sendMessage(agentId, summaryPrompt, [], true);
+      updateNode(nodeId, { summary: summaryAnswer });
+    } catch (err) {
+      console.error('摘要生成失败', err);
     }
   };
 
@@ -235,14 +243,14 @@ export default function ConversationNode({ id, data }) {
           {data.question}
         </div>
 
-
         {attachedFiles.length > 0 && (
           <div className="px-2 pb-1">
             <div className="text-xs text-gray-500 mb-1">附件：</div>
             <div className="flex flex-wrap gap-1">
-              {attachedFiles.map((name, i) => (
+              {attachedFiles.map((file, i) => (
                 <span key={i} className="inline-flex items-center bg-gray-100 rounded px-2 py-0.5 text-xs">
-                  <span className="mr-1">📄</span>{name}
+                  <span className="mr-1">📄</span>
+                  {typeof file === 'string' ? file : file.name}
                 </span>
               ))}
             </div>
@@ -254,9 +262,7 @@ export default function ConversationNode({ id, data }) {
           <ReactMarkdown 
             remarkPlugins={[remarkGfm, remarkMath]}
             rehypePlugins={[rehypeRaw, rehypeKatex]}
-            components={{
-              pre: PreWithCopy,
-            }}
+            components={{ pre: PreWithCopy }}
           >
             {preprocessLatex(data.answer)}
           </ReactMarkdown>
@@ -264,10 +270,7 @@ export default function ConversationNode({ id, data }) {
 
         {isCollapsed && (
           <div className="px-2 pb-2 text-center">
-            <button
-              onClick={handleToggleCollapse}
-              className="text-xs text-blue-500 hover:underline"
-            >
+            <button onClick={handleToggleCollapse} className="text-xs text-blue-500 hover:underline">
               显示全部
             </button>
           </div>
@@ -306,18 +309,25 @@ export default function ConversationNode({ id, data }) {
           type="file"
           ref={fileInputRef}
           style={{ display: 'none' }}
+          multiple
           accept=".txt,.md,.json,.js,.jsx,.ts,.tsx,.py,.html,.htm,.css,.csv,.xml,.yaml,.yml,.log,.sh,.bat,.ini,.cfg,.conf,text/plain"
-          onChange={handleFileUpload}
+          onChange={handleFilesUpload}
         />
       </div>
 
-      {attachedFile && (
+      {attachedFiles.length > 0 && (
         <div className="px-2 pt-1">
-          <div className="flex items-center justify-between bg-gray-100 rounded px-2 py-1 text-xs">
-            <span className="truncate flex items-center">
-              <span className="mr-1">📄</span>{attachedFile.name}
-            </span>
-            <button className="ml-2 text-gray-500 hover:text-red-500" onClick={removeAttachedFile}>✕</button>
+          <div className="flex flex-wrap gap-1">
+            {attachedFiles.map((file, idx) => (
+              <div key={idx} className="flex items-center bg-gray-100 rounded px-2 py-0.5 text-xs">
+                <span className="mr-1">📄</span>
+                <span className="truncate max-w-[100px]">{file.name}</span>
+                <button
+                  className="ml-1 text-gray-500 hover:text-red-500"
+                  onClick={() => removeAttachedFile(idx)}
+                >✕</button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -326,7 +336,7 @@ export default function ConversationNode({ id, data }) {
         ref={inputRef}
         className="w-full p-2 text-sm border-0 focus:ring-0 resize-none"
         rows={3}
-        placeholder={attachedFile ? "输入问题（可选）..." : "输入您的问题..."}
+        placeholder={attachedFiles.length > 0 ? "输入问题（可选）..." : "输入您的问题..."}
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -335,7 +345,7 @@ export default function ConversationNode({ id, data }) {
       <button
         className="m-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:bg-gray-400"
         onClick={handleSend}
-        disabled={isSending || (!question.trim() && !attachedFile)}
+        disabled={isSending || (!question.trim() && attachedFiles.length === 0)}
       >
         {isSending ? '发送中...' : '发送'}
       </button>

@@ -6,8 +6,18 @@ export function collectContext(nodes, startNodeId) {
     const node = nodes.find(n => n.id === currentId);
     if (!node) break;
     if (!node.hidden && node.answer && node.question) {
-      history.unshift({ 
-        question: node.question, 
+      // 构建该节点的上下文文本：附件内容 + 问题 + 回复
+      let enrichedQuestion = node.question;
+      const attachedFiles = node.attachedFiles || [];
+      const filesWithContent = attachedFiles
+        .filter(f => typeof f === 'object' && f.content)
+        .map(f => `[${f.name}]\n${f.content}`)
+        .join('\n\n');
+      if (filesWithContent) {
+        enrichedQuestion = filesWithContent + '\n\n' + enrichedQuestion;
+      }
+      history.unshift({
+        question: enrichedQuestion,
         answer: node.answer,
         summary: node.summary || null,
       });
