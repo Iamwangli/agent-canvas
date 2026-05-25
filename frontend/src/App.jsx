@@ -133,12 +133,16 @@ export default function App() {
       for (const [key, expectedEdge] of expectedEdgesMap.entries()) {
         const existing = existingEdgesMap.get(key);
         const isFlow = flowPathEdges.includes(expectedEdge.id);
+        const edgeStyle = isFlow 
+          ? { strokeWidth, stroke: '#facc15' }   // 流光线金色
+          : { strokeWidth, stroke: strokeColor }; // 普通边动态颜色
+      
         newEdges.push({
           ...expectedEdge,
           sourceHandle: expectedEdge.sourceHandle || existing?.sourceHandle || null,
           targetHandle: expectedEdge.targetHandle || existing?.targetHandle || null,
           className: isFlow ? 'flow-active' : '',
-          style: { strokeWidth, stroke: strokeColor },
+          style: edgeStyle,
           data: { isFlowActive: isFlow },
         });
       }

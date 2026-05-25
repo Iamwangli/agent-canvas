@@ -56,6 +56,7 @@ export default function ConversationNode({ id, data }) {
   const setFlowPath = useStore(state => state.setFlowPath);
   const clearFlowPath = useStore(state => state.clearFlowPath);
   const flowPathNodes = useStore(state => state.flowPathNodes);
+  const isFlow = flowPathNodes.includes(id);
   const viewportZoom = useStore(state => state.viewportZoom);
   const { getAutoCount, incrementAutoCount, resetAutoCount } = useStore();
 
@@ -234,9 +235,11 @@ export default function ConversationNode({ id, data }) {
         style={{ 
           width: nodeWidth, 
           minWidth: 200,
-          border: '2px solid black', // 固定基础边框
-          outline: `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`,
-          outlineOffset: '-2px', // 向内绘制，模仿边框效果
+          border: '2px solid black',
+          outline: isFlow 
+            ? 'none' 
+            : `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`,
+          outlineOffset: '-2px',
         }}
       >
         <NodeResizer
@@ -303,7 +306,9 @@ export default function ConversationNode({ id, data }) {
         width: nodeWidth, 
         minWidth: 200,
         border: '2px solid black', // 固定基础边框
-        outline: `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`,
+        outline: isFlow 
+          ? 'none' 
+          : `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`,
         outlineOffset: '-2px', // 向内绘制，模仿边框效果
       }}
     >
