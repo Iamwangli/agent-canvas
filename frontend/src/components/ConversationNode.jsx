@@ -46,7 +46,7 @@ export default function ConversationNode({ id, data }) {
   const [question, setQuestion] = useState(data.question || '');
   const [isEditing, setIsEditing] = useState(!data.answer);
   const [isSending, setIsSending] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState([]); // 改为数组
+  const [attachedFiles, setAttachedFiles] = useState([]);
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -56,9 +56,21 @@ export default function ConversationNode({ id, data }) {
   const setFlowPath = useStore(state => state.setFlowPath);
   const clearFlowPath = useStore(state => state.clearFlowPath);
   const flowPathNodes = useStore(state => state.flowPathNodes);
+  const viewportZoom = useStore(state => state.viewportZoom);
   const { getAutoCount, incrementAutoCount, resetAutoCount } = useStore();
 
   const nodeWidth = data.width || 800;
+
+  // 动态边框计算（必须放在组件内）
+  const BASE_OUTLINE = 2.0;
+  const MIN_OUTLINE = 1.0;
+  const BOLD_FACTOR = 0;
+
+  function getOutlineWidth(zoom) {
+    if (!zoom || zoom >= 1) return BASE_OUTLINE;
+    const factor = 1 + BOLD_FACTOR * (1 - zoom);
+    return Math.max(MIN_OUTLINE, (BASE_OUTLINE * factor) / zoom);
+  }
 
   useEffect(() => {
     if (isEditing && inputRef.current) inputRef.current.focus();
@@ -76,7 +88,6 @@ export default function ConversationNode({ id, data }) {
       return;
     }
 
-    // 读取每个文件
     const newFiles = [];
     let readCount = 0;
     files.forEach(file => {
@@ -85,13 +96,12 @@ export default function ConversationNode({ id, data }) {
         newFiles.push({ name: file.name, content: event.target.result });
         readCount++;
         if (readCount === files.length) {
-          // 全部读取完成后更新状态（追加到已有文件）
           setAttachedFiles(prev => [...prev, ...newFiles]);
         }
       };
       reader.readAsText(file, 'UTF-8');
     });
-    e.target.value = ''; // 允许再次选择相同文件
+    e.target.value = '';
   };
 
   const removeAttachedFile = (index) => {
@@ -134,7 +144,6 @@ export default function ConversationNode({ id, data }) {
         updateNode(id, { agentId });
       }
 
-      // 将当前附件内容拼接（发送时保持文件在前）
       let apiQuestion = question;
       if (attachedFiles.length > 0) {
         const fileContents = attachedFiles.map(f => `[${f.name}]\n${f.content}`).join('\n\n');
@@ -143,14 +152,11 @@ export default function ConversationNode({ id, data }) {
 
       const { answer, autoAction } = await sendMessage(agentId, apiQuestion, context);
 
-      // 将已有的附件（可能是之前留下的）与新附件合并
       const existingAttachedFiles = node.attachedFiles || [];
-      // 兼容旧数据：如果元素是字符串，视为只有名称没有内容，我们保留它但不包含内容
       const normalizedExisting = existingAttachedFiles.map(item => {
         if (typeof item === 'string') return { name: item, content: '' };
         return item;
       });
-      // 合并去重（根据名称）
       const merged = [...normalizedExisting];
       attachedFiles.forEach(newFile => {
         if (!merged.some(f => f.name === newFile.name)) {
@@ -160,11 +166,10 @@ export default function ConversationNode({ id, data }) {
 
       updateNode(id, { question, answer, attachedFiles: merged });
 
-      // 摘要生成保持不变
       generateSummary(id, question, answer, agentId);
 
       setIsEditing(false);
-      setAttachedFiles([]); // 清空当前待发送列表
+      setAttachedFiles([]);
       clearFlowPath();
 
       if (autoNodeEnabled && autoAction) {
@@ -226,7 +231,13 @@ export default function ConversationNode({ id, data }) {
     return (
       <div
         className={`conversation-node ${data.hidden ? 'node-hidden' : ''} ${data.isAutoCreated ? 'auto-created' : ''} ${flowPathNodes.includes(id) ? 'flow-active' : ''}`}
-        style={{ width: nodeWidth, minWidth: 200 }}
+        style={{ 
+          width: nodeWidth, 
+          minWidth: 200,
+          border: '2px solid black', // 固定基础边框
+          outline: `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`,
+          outlineOffset: '-2px', // 向内绘制，模仿边框效果
+        }}
       >
         <NodeResizer
           minWidth={200} maxWidth={MAX_NODE_WIDTH}
@@ -286,7 +297,16 @@ export default function ConversationNode({ id, data }) {
 
   // 编辑状态
   return (
-    <div className="conversation-node" style={{ width: nodeWidth, minWidth: 200 }}>
+    <div 
+      className="conversation-node" 
+      style={{ 
+        width: nodeWidth, 
+        minWidth: 200,
+        border: '2px solid black', // 固定基础边框
+        outline: `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`,
+        outlineOffset: '-2px', // 向内绘制，模仿边框效果
+      }}
+    >
       <NodeResizer
         minWidth={200} maxWidth={MAX_NODE_WIDTH}
         onResize={(_, params) => updateNode(id, { width: params.width })}

@@ -15,7 +15,6 @@ const useStore = create(
 
       init: () => {
         const { files, hasHydrated } = get();
-        // 仅当 localStorage 恢复完毕且确实没有文件时才创建默认文件
         if (hasHydrated && files.length === 0) {
           const newId = uuidv4();
           set({
@@ -152,11 +151,14 @@ const useStore = create(
 
       setFlowPath: (nodeIds, edgeIds) => set({ flowPathNodes: nodeIds, flowPathEdges: edgeIds }),
       clearFlowPath: () => set({ flowPathNodes: [], flowPathEdges: [] }),
+
+      // 新增：缩放比例状态
+      viewportZoom: 1,
+      setViewportZoom: (zoom) => set({ viewportZoom: zoom }),
     }),
     {
       name: 'agent-canvas-files',
       storage: createJSONStorage(() => localStorage),
-      // 修复点：localStorage 恢复完毕后设置 hasHydrated
       onRehydrateStorage: () => (state) => {
         state.hasHydrated = true;
       },

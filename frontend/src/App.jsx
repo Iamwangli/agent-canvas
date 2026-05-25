@@ -9,6 +9,7 @@ import ReactFlow, {
   Panel,
   addEdge,
   MarkerType,
+  useOnViewportChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import useStore from './store';
@@ -33,6 +34,19 @@ const DIRECTION_HANDLE_MAP = {
   right:  { source: 'source-left',   target: 'target-right' },
 };
 
+function ViewportListener() {
+  const setViewportZoom = useStore(state => state.setViewportZoom);
+  useOnViewportChange({
+    onChange: useCallback((viewport) => {
+      setViewportZoom(viewport.zoom);
+    }, [setViewportZoom]),
+    onMoveEnd: useCallback((viewport) => {
+      setViewportZoom(viewport.zoom);
+    }, [setViewportZoom]),
+  });
+  return null;
+}
+
 export default function App() {
   const {
     init,
@@ -56,6 +70,18 @@ export default function App() {
   const [initialized, setInitialized] = useState(false);
 
   const currentNodes = getCurrentNodes();
+  const viewportZoom = useStore(state => state.viewportZoom);
+
+  // 动态连线粗细函数（必须放在组件内部）
+  const BASE_STROKE = 2.0;
+  const MIN_STROKE = 1.0;
+  const BOLD_FACTOR_STROKE = 0;   // 极高加粗系数
+
+  function getStrokeWidth(zoom) {
+    if (!zoom || zoom >= 1) return BASE_STROKE;
+    const factor = 1 + BOLD_FACTOR_STROKE * (1 - zoom);
+    return Math.max(MIN_STROKE, (BASE_STROKE * factor) / zoom);
+  }
 
   // hydrate 后初始化
   useEffect(() => {
@@ -76,8 +102,12 @@ export default function App() {
     setNodes(flowNodes);
   }, [currentNodes, setNodes]);
 
-  // 同步边：子 → 父，从节点数据读取 Handle 信息
+  // 同步边 + 动态样式
   useEffect(() => {
+    const zoom = viewportZoom || 1;
+    const strokeWidth = getStrokeWidth(zoom);
+    const strokeColor = zoom < 0.5 ? '#000' : '#374151';
+
     setEdges(prevEdges => {
       const expectedEdgesMap = new Map();
       currentNodes.forEach(node => {
@@ -91,7 +121,6 @@ export default function App() {
             animated: node.isAutoCreated || false,
             markerEnd: { type: MarkerType.ArrowClosed },
             data: { isFlowActive: false },
-            // 优先使用节点中保存的 Handle
             sourceHandle: node.sourceHandle || null,
             targetHandle: node.targetHandle || null,
           });
@@ -106,17 +135,17 @@ export default function App() {
         const isFlow = flowPathEdges.includes(expectedEdge.id);
         newEdges.push({
           ...expectedEdge,
-          // 如果节点中没有 Handle，尝试从已有边恢复（兜底）
           sourceHandle: expectedEdge.sourceHandle || existing?.sourceHandle || null,
           targetHandle: expectedEdge.targetHandle || existing?.targetHandle || null,
           className: isFlow ? 'flow-active' : '',
+          style: { strokeWidth, stroke: strokeColor },
           data: { isFlowActive: isFlow },
         });
       }
 
       return newEdges;
     });
-  }, [currentNodes, flowPathEdges, setEdges]);
+  }, [currentNodes, flowPathEdges, setEdges, viewportZoom]);
 
   // Agent 根节点初始化
   useEffect(() => {
@@ -179,14 +208,12 @@ export default function App() {
       return;
     }
 
-    // 更新子节点，同时保存 Handle 信息
     updateNode(source, {
       parentId: target,
       sourceHandle,
       targetHandle,
     });
 
-    // 添加边（保留 Handle）
     setEdges(eds => addEdge({
       id: `${source}-${target}`,
       source,
@@ -198,14 +225,12 @@ export default function App() {
       markerEnd: { type: MarkerType.ArrowClosed },
     }, eds));
 
-    // 同步 agentId
     let newAgentId = targetNode.type === 'agent' ? targetNode.id : targetNode.agentId;
     if (newAgentId) updateNode(source, { agentId: newAgentId });
   }, [currentNodes, updateNode, setEdges]);
 
   const onEdgeDoubleClick = useCallback((event, edge) => {
     const childId = edge.source;
-    // 清除节点的 Handle 和父节点
     updateNode(childId, {
       parentId: null,
       sourceHandle: null,
@@ -315,8 +340,7 @@ export default function App() {
     const parentRFNode = reactFlowInstance.getNode(parentId);
     if (!childRFNode || !parentRFNode) return;
   
-    // 获取实际渲染的尺寸，若获取不到则回退
-    // ConversationNode JSX 默认宽度为 800，与 data.width || 800 保持一致
+    // 直接使用 React Flow 的实时尺寸，因为 outline 不影响盒模型
     const childWidth = childRFNode.width ?? (childNodeData.width || 800);
     const parentWidth = parentRFNode.width ?? 120;
     const childHeight = childRFNode.height ?? 100;
@@ -342,7 +366,6 @@ export default function App() {
       newY = parentCenterY - childHeight / 2;
     }
   
-    // 不取整以保持精确居中，避免 smoothstep 连线产生可见折线
     updateNode(nodeId, { position: { x: newX, y: newY } });
     closeMenu();
   }, [menu, currentNodes, reactFlowInstance, updateNode]);
@@ -447,6 +470,7 @@ export default function App() {
           return sourceNode?.type !== 'agent';
         }}
       >
+        <ViewportListener />
         <Background gap={20} size={1} />
         <Controls />
         <MiniMap />
