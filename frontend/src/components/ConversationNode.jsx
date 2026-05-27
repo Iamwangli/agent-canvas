@@ -235,11 +235,17 @@ export default function ConversationNode({ id, data }) {
         style={{ 
           width: nodeWidth, 
           minWidth: 200,
-          border: '2px solid black',
-          outline: isFlow 
-            ? 'none' 
-            : `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`,
-          outlineOffset: '-2px',
+          border: data.hidden 
+            ? '2px dashed #999'          // 隐藏时：灰色虚线边框
+            : '2px solid black',        // 正常时：黑色实线边框
+          outline: data.hidden 
+            ? 'none'                     // 隐藏时不要动态轮廓
+            : (isFlow 
+                ? 'none' 
+                : `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`
+              ),
+          outlineOffset: data.hidden ? 0 : '-2px',
+          opacity: data.hidden ? 0.4 : 1,   // 半透明效果保留
         }}
       >
         <NodeResizer
@@ -305,11 +311,17 @@ export default function ConversationNode({ id, data }) {
       style={{ 
         width: nodeWidth, 
         minWidth: 200,
-        border: '2px solid black', // 固定基础边框
-        outline: isFlow 
-          ? 'none' 
-          : `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`,
-        outlineOffset: '-2px', // 向内绘制，模仿边框效果
+        border: data.hidden 
+          ? '2px dashed #999'          // 隐藏时：灰色虚线边框
+          : '2px solid black',        // 正常时：黑色实线边框
+        outline: data.hidden 
+          ? 'none'                     // 隐藏时不要动态轮廓
+          : (isFlow 
+              ? 'none' 
+              : `${getOutlineWidth(viewportZoom)}px solid ${(viewportZoom || 1) < 0.5 ? '#111' : 'transparent'}`
+            ),
+        outlineOffset: data.hidden ? 0 : '-2px',
+        opacity: data.hidden ? 0.4 : 1,   // 半透明效果保留
       }}
     >
       <NodeResizer

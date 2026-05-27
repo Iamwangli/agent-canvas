@@ -51,6 +51,7 @@ app.get('/api/agents', (req, res) => {
     name: agent.name,
     model: agent.model,
     type: 'agent',
+    initialContent: agent.initialContent || '',   // 传递给前端
   }));
   res.json(agentList);
 });

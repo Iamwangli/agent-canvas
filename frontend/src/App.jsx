@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -152,24 +152,50 @@ export default function App() {
   }, [currentNodes, flowPathEdges, setEdges, viewportZoom]);
 
   // Agent 根节点初始化
+  const agentInitDone = useRef(false);
+  
   useEffect(() => {
-    if (!initialized || !hasHydrated) return;
-    const hasAgentRoot = currentNodes.some(n => n.type === 'agent');
-    if (!hasAgentRoot) {
-      getAgents()
-        .then(agentList => {
-          if (agentList.length) {
-            const startX = 100, startY = 100, gapX = 350;
-            const newAgentNodes = agentList.map((agent, index) => ({
-              id: agent.id, type: 'agent', name: agent.name, model: agent.model,
-              position: { x: startX + index * gapX, y: startY },
-            }));
-            updateCurrentNodes([...currentNodes, ...newAgentNodes]);
-          }
-        })
-        .catch(err => console.error('Failed to load agents', err));
-    }
-  }, [initialized, currentNodes, updateCurrentNodes, hasHydrated]);
+    if (!initialized || !hasHydrated || agentInitDone.current) return;
+  
+    getAgents()
+      .then(agentList => {
+        if (agentList.length === 0) return;
+  
+        const currentNodes = getCurrentNodes();
+        const startX = 100, startY = 100, gapX = 350;
+        const newAgentNodes = agentList.map((agent, index) => ({
+          id: agent.id,
+          type: 'agent',
+          name: agent.name,
+          model: agent.model,
+          initialContent: agent.initialContent || '',
+          position: { x: startX + index * gapX, y: startY },
+        }));
+
+        const hasAgentRoot = currentNodes.some(n => n.type === 'agent');
+        let updatedNodes;
+        if (!hasAgentRoot) {
+          updatedNodes = [...currentNodes, ...newAgentNodes];
+        } else {
+          updatedNodes = currentNodes.map(node => {
+            if (node.type !== 'agent') return node;
+            const updatedAgent = newAgentNodes.find(a => a.id === node.id);
+            if (updatedAgent) {
+              return { ...node, initialContent: updatedAgent.initialContent };
+            }
+            return node;
+          });
+          newAgentNodes.forEach(newAgent => {
+            if (!updatedNodes.some(n => n.id === newAgent.id)) {
+              updatedNodes.push(newAgent);
+            }
+          });
+        }
+        updateCurrentNodes(updatedNodes);
+        agentInitDone.current = true;
+      })
+      .catch(err => console.error('Failed to load agents', err));
+  }, [initialized, hasHydrated]); // 仅依赖 initialized 和 hasHydrated
 
   // 自动创建监听
   useEffect(() => {

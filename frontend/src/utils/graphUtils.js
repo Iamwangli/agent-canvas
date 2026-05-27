@@ -2,11 +2,18 @@
 export function collectContext(nodes, startNodeId) {
   const history = [];
   let currentId = startNodeId;
+  let agentNode = null;
+
   while (currentId) {
     const node = nodes.find(n => n.id === currentId);
     if (!node) break;
+
+    if (node.type === 'agent') {
+      agentNode = node;   // 找到根节点后退出循环
+      break;
+    }
+
     if (!node.hidden && node.answer && node.question) {
-      // 构建该节点的上下文文本：附件内容 + 问题 + 回复
       let enrichedQuestion = node.question;
       const attachedFiles = node.attachedFiles || [];
       const filesWithContent = attachedFiles
@@ -24,6 +31,15 @@ export function collectContext(nodes, startNodeId) {
     }
     currentId = node.parentId;
   }
+
+  // 如果找到了根节点，且它有初始内容，则插入到最前面
+  if (agentNode && agentNode.initialContent && agentNode.initialContent.trim()) {
+    history.unshift({
+      role: 'system',
+      content: agentNode.initialContent.trim(),
+    });
+  }
+
   return history;
 }
 
