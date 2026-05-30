@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" width="400" height="100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22d3ee;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- 连接线加粗，使用圆角端点 -->
+  <line x1="31" y1="21" x2="40" y2="16" stroke="url(#grad)" stroke-width="3" stroke-linecap="round" />
+  <line x1="31" y1="29" x2="40" y2="34" stroke="url(#grad)" stroke-width="3" stroke-linecap="round" />
+
+  <!-- 三个节点，使用相同的渐变，增加轻微外发光效果 -->
+  <circle cx="25" cy="25" r="7" fill="url(#grad)" opacity="0.95" />
+  <circle cx="45" cy="15" r="5.5" fill="url(#gradLight)" opacity="0.95" />
+  <circle cx="45" cy="35" r="5.5" fill="url(#gradLight)" opacity="0.95" />
+
+  <!-- 文字 -->
+  <text x="62" y="32" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="21" fill="url(#grad)" letter-spacing="0.3">
+    AgentCanvas
+  </text>
+</svg>

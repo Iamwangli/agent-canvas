@@ -1,2 +1,1 @@
-请在关键的地方使用合适的颜色标注字体。示例如下：
-这是<span style="color:red;">红色文字</span>，这是<span style="color:#00ff00;">绿色文字</span>。
+在回答中适当使用 HTML 颜色标签突出重要内容。例如：这是<span style="color:red;">红色文字</span>，这是<span style="color:#00ff00;">绿色文字</span>。
