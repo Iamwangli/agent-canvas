@@ -490,7 +490,7 @@ export default function App() {
         <Controls />
         <MiniMap />
         <Panel position="top-right" className="bg-white p-2 rounded shadow text-xs">
-          提示：双击节点创建子对话 | 拖拽连线重设父节点 | 双击连线删除 | 右键节点操作
+          提示：双击节点创建子对话 | 拖拽连线重设父节点 | 双击连线删除 | 右键节点操作 | 隐藏节点索引时跳过
         </Panel>
       </ReactFlow>
       {menu && (
