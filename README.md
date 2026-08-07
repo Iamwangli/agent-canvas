@@ -82,4 +82,23 @@ DEEPSEEK_API_KEY=[Your API Key]
 
 本仓库代码采用 个人非商业使用许可证。允许个人学习、研究、非商业项目免费使用。商业使用必须购买授权，请联系 [iamwanglihaha@gmail.com]。
 
+## 🌐 在线版本
+
+想即刻体验完整功能，无需本地部署？访问我们的线上版：
+
+👉 **[agentcanvas.site](https://agentcanvas.site)**
+
+在线版本在开源基础版之上，增加了：
+
+- 🔐 用户系统：邮箱注册、登录、密码找回
+- ☁️ 云端存储：多设备同步对话历史，支持导出 TXT
+- ⏱️ 对话历史管理：新建、删除、重命名会话，云端/本地自由切换
+- 🧾 用量统计与充值：按量计费，支持微信/支付宝扫码支付
+- 🔔 反馈系统：意见、建议、Bug 反馈直达开发者
+- 🎨 更多 UI 优化：护眼暖灰画布、折叠节点、摘要覆盖层等
+
+全部数据加密传输，你的对话内容仅自己可见，开发者无法查看。目前新用户注册即享 **1.00 元** 免费额度，欢迎来试试！
+
+如有任何问题或合作意向，欢迎邮件联系：[iamwanglihaha@gmail.com](mailto:iamwanglihaha@gmail.com)
+
 💖 [Sponsor · 赞助](https://iamwangli.github.io/agent-canvas/donate/)
