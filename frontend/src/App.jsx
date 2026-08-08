@@ -118,7 +118,7 @@ export default function App() {
             id: `${node.id}-${node.parentId}`,
             source: node.id,
             target: node.parentId,
-            type: 'smoothstep',
+            type: 'default',
             animated: node.isAutoCreated || false,
             markerEnd: { type: MarkerType.ArrowClosed },
             data: { isFlowActive: false },
@@ -235,7 +235,7 @@ export default function App() {
       target,
       sourceHandle,
       targetHandle,
-      type: 'smoothstep',
+      type: 'default',
       animated: sourceNode.isAutoCreated || false,
       markerEnd: { type: MarkerType.ArrowClosed },
     }, eds));
@@ -420,7 +420,7 @@ export default function App() {
       target: parentId,
       sourceHandle: sHandle,
       targetHandle: tHandle,
-      type: 'smoothstep',
+      type: 'default',
       animated: false,
       markerEnd: { type: MarkerType.ArrowClosed },
     }, eds));
@@ -449,7 +449,7 @@ export default function App() {
       target: node.id,
       sourceHandle: 'source-top',
       targetHandle: 'target-bottom',
-      type: 'smoothstep',
+      type: 'default',
       animated: false,
       markerEnd: { type: MarkerType.ArrowClosed },
     }, eds));
