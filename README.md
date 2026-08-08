@@ -4,6 +4,8 @@
 
 AgentCanvas 是一个可视化的多智能体协作平台。你可以在无限画布上创建对话节点，通过树形结构构建推理链，每个节点代表一轮完整的问答。支持文件上传、节点隐藏、自动分支、多会话管理，所有数据自动保存在浏览器本地。
 
+详见 AgentCanvas_productSpecifications.md。
+
 ![运行效果](./demo.png "demo")
 
 ## ✨ 一、核心特性
@@ -74,11 +76,7 @@ DEEPSEEK_API_KEY=[Your API Key]
 
     浏览器中输入：http://localhost:5173/
 
-## 四、详见信息
-
-AgentCanvas_productSpecifications.md
-
-## 🌐 五、在线版本
+## 🌐 四、在线版本
 
 想即刻体验完整功能，无需本地部署？访问我们的线上版：
 
@@ -95,7 +93,7 @@ AgentCanvas_productSpecifications.md
 
 全部数据加密传输，你的对话内容仅自己可见，开发者无法查看。目前新用户注册即享 **1.00 元** 免费额度，欢迎来试试！
 
-## 六、许可说明
+## 五、许可说明
 
 本仓库代码采用 个人非商业使用许可证。允许个人学习、研究、非商业项目免费使用。商业使用必须购买授权。
 如有任何问题或合作意向，欢迎邮件联系：[iamwanglihaha@gmail.com](mailto:iamwanglihaha@gmail.com)
